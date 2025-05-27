@@ -82,13 +82,11 @@ const LoginPageCenter = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    console.log('🔐 secretKey =', secretKey);
 
 
     try {
-      console.log("formData , ",formData)
       const encrypted = CryptoJS.AES.encrypt(JSON.stringify(formData), secretKey).toString();
-      console.log("encrypted , ",encrypted)
+   
       const result = await dispatch(login({ data: encrypted }));
 
       if (result.payload) {
