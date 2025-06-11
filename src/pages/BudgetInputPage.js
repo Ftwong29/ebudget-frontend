@@ -190,9 +190,9 @@ const BudgetInputPage = () => {
         currency: user?.currency || 'N/A',
         values: inputValues
       }), secretKey).toString();
-      
+
       await axiosInstance.post(`/gl/glinput-save`, { data: encryptedPayload });
-      
+
       setInitialValues(inputValues);
       setLastSavedAt(new Date());
       setSnackbarOpen(true);
@@ -252,13 +252,29 @@ const BudgetInputPage = () => {
             // 在 AccordionDetails 中加入 Total 展示：
             <Accordion key={sub2} sx={{ backgroundColor: '#e8f5e9' }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="h6">{sub2} (Total: {formatNumber(calculateSub2Total(subTitles))})</Typography>
+                <Typography variant="h6">
+                  {sub2} (Total: {formatNumber(calculateSub2Total(subTitles))})
+                  {calculateSub2Total(subTitles, previousValues) > 0 && (
+                    <Typography component="span" variant="caption" sx={{ ml: 2 }}>
+                      Prev: {formatNumber(calculateSub2Total(subTitles, previousValues))}
+                    </Typography>
+                  )}
+                </Typography>
+
               </AccordionSummary>
               <AccordionDetails>
                 {Object.entries(subTitles).map(([subTitle, items]) => (
                   <Accordion key={subTitle} sx={{ mb: 2, backgroundColor: '#f1f8e9' }}>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography variant="subtitle1">{subTitle} (Total: {formatNumber(calculateGroupTotal(items))})</Typography>
+                      <Typography variant="subtitle1">
+                        {subTitle} (Total: {formatNumber(calculateGroupTotal(items))})
+                        {calculateGroupTotal(items, previousValues) > 0 && (
+                          <Typography component="span" variant="caption" sx={{ ml: 2 }}>
+                            Prev: {formatNumber(calculateGroupTotal(items, previousValues))}
+                          </Typography>
+                        )}
+                      </Typography>
+
                     </AccordionSummary>
                     <AccordionDetails>
                       {items.map((item) => (

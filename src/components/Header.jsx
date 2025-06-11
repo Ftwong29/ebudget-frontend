@@ -20,23 +20,21 @@ const Header = () => {
   const location = useLocation();
   const { user } = useSelector((state) => state.auth);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [reportAnchorEl, setReportAnchorEl] = useState(null); // 📌 For Report dropdown
+  const [reportAnchorEl, setReportAnchorEl] = useState(null);
+  const [functionAnchorEl, setFunctionAnchorEl] = useState(null);
 
   const handleAvatarClick = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
   const handleReportMenuOpen = (event) => setReportAnchorEl(event.currentTarget);
   const handleReportMenuClose = () => setReportAnchorEl(null);
+  const handleFunctionMenuOpen = (event) => setFunctionAnchorEl(event.currentTarget);
+  const handleFunctionMenuClose = () => setFunctionAnchorEl(null);
 
   const handleLogout = async () => {
     handleMenuClose();
     await dispatch(logout());
     navigate('/login');
   };
-
-  const menuItems = [
-    { label: 'Dashboard', path: '/dashboard' },
-    { label: 'Budget Input', path: '/budget-input' },
-  ];
 
   return (
     <AppBar
@@ -65,29 +63,35 @@ const Header = () => {
 
         {/* ✅ Center Menu Items */}
         <Box sx={{ display: 'flex', gap: 1 }}>
-          {menuItems.map((item) => (
-            <Button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              sx={{
-                color: location.pathname === item.path ? '#ffffff' : '#dce3e8',
-                fontWeight: location.pathname === item.path ? 'bold' : 'normal',
-                textTransform: 'none',
-                borderRadius: 2,
-                px: 2,
-                backgroundColor: location.pathname === item.path
-                  ? 'rgba(255,255,255,0.15)'
-                  : 'transparent',
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.2)'
-                }
-              }}
-            >
-              {item.label}
-            </Button>
-          ))}
+          {/* Function Dropdown */}
+          <Button
+            onClick={handleFunctionMenuOpen}
+            sx={{
+              color: '#dce3e8',
+              fontWeight: 'normal',
+              textTransform: 'none',
+              borderRadius: 2,
+              px: 2,
+              backgroundColor: 'transparent',
+              '&:hover': {
+                backgroundColor: 'rgba(255,255,255,0.2)'
+              }
+            }}
+          >
+            Function
+          </Button>
+          <Menu
+            anchorEl={functionAnchorEl}
+            open={Boolean(functionAnchorEl)}
+            onClose={handleFunctionMenuClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+          >
+            <MenuItem onClick={() => { navigate('/budget-input'); handleFunctionMenuClose(); }}>Budget Input</MenuItem>
+            <MenuItem onClick={() => { navigate('/budget-upload'); handleFunctionMenuClose(); }}>Budget Upload</MenuItem>
+          </Menu>
 
-          {/* ✅ Report Menu */}
+          {/* Report Dropdown */}
           <Button
             onClick={handleReportMenuOpen}
             sx={{
@@ -111,14 +115,11 @@ const Header = () => {
             anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
             transformOrigin={{ vertical: 'top', horizontal: 'left' }}
           >
-            <MenuItem
-              onClick={() => {
-                handleReportMenuClose();
-                navigate('/report/pnl');
-              }}
-            >
-              PNL Report
+            <MenuItem onClick={() => { handleReportMenuClose(); navigate('/report/pnl'); }}>PNL Report</MenuItem>
+            <MenuItem onClick={() => { handleReportMenuClose(); navigate('/report/pnl-summary'); }}>
+              PNL Summary
             </MenuItem>
+
           </Menu>
         </Box>
 
