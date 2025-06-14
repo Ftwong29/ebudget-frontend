@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Box, Typography, Grid, Paper, CircularProgress, Divider, MenuItem, Select, FormControl, InputLabel, Chip
+  Box, Typography, Grid, Paper, CircularProgress, Chip, Divider
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useSelector } from 'react-redux';
@@ -38,48 +38,53 @@ const COLORS = ['#7a94a6', '#b5c7bd', '#d4a5a5', '#c5a880', '#a9a9b3'];
 
 const DashboardPage = () => {
   const { user } = useSelector((state) => state.auth);
-  const [summary, setSummary] = useState(null);
+  const [summary2025, setSummary2025] = useState(null);
+  const [summary2024, setSummary2024] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [year, setYear] = useState(2025);
 
   useEffect(() => {
-    const fetchSummary = async () => {
+    const fetchSummaries = async () => {
       try {
-        const res = await axiosInstance.get('/report/pnl-summary', {
-          params: {
-            glyear: year,
-            company: user?.company_name
-          }
-        });
-        setSummary(res.data.summary);
+        const [res2025, res2024] = await Promise.all([
+          axiosInstance.get('/report/pnl-summary', {
+            params: { glyear: 2025, company: user?.company_name },
+          }),
+          axiosInstance.get('/report/pnl-summary', {
+            params: { glyear: 2024, company: user?.company_name },
+          }),
+        ]);
+        setSummary2025(res2025.data.summary);
+        setSummary2024(res2024.data.summary);
       } catch (err) {
-        console.error('Failed to fetch PNL summary', err);
+        console.error('Failed to fetch summary reports', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchSummary();
-  }, [user, year]);
+    fetchSummaries();
+  }, [user]);
 
   const importantMetrics = [
-    { label: 'Revenue', value: summary?.revenue },
-    { label: 'Gross Profit', value: summary?.gross_profit },
-    { label: 'Net Profit After Tax', value: summary?.net_profit_after_tax },
-    { label: 'Retained Profit', value: summary?.retained_profit_carried_forward },
+    'revenue',
+    'gross_profit',
+    'net_profit_after_tax',
+    'retained_profit_carried_forward'
   ];
 
-  const barData = [
-    { name: 'Revenue', value: summary?.revenue || 0 },
-    { name: 'Cost of Sales', value: summary?.total_cost_of_sales || 0 },
-    { name: 'Gross Profit', value: summary?.gross_profit || 0 },
-    { name: 'Finance Cost', value: summary?.finance_cost || 0 },
-    { name: 'Net Profit', value: summary?.net_profit_after_tax || 0 },
-  ];
+  const marginRatio = summary2025 && summary2025.revenue
+    ? (summary2025.gross_profit / summary2025.revenue * 100).toFixed(1)
+    : '0.0';
+
+  const barData = importantMetrics.map((key) => ({
+    name: key.replace(/_/g, ' ').toUpperCase(),
+    '2025': summary2025?.[key] || 0,
+    '2024': summary2024?.[key] || 0,
+  }));
 
   const pieData = [
-    { name: 'Revenue', value: summary?.revenue || 0 },
-    { name: 'Gross Profit', value: summary?.gross_profit || 0 },
-    { name: 'Net Profit', value: summary?.net_profit_after_tax || 0 },
+    { name: 'Revenue', value: summary2025?.revenue || 0 },
+    { name: 'Gross Profit', value: summary2025?.gross_profit || 0 },
+    { name: 'Net Profit', value: summary2025?.net_profit_after_tax || 0 },
   ];
 
   return (
@@ -89,35 +94,31 @@ const DashboardPage = () => {
           📊 Financial Dashboard
         </Typography>
         <Typography variant="body1" sx={{ color: '#757875', mb: 3 }}>
-          A quick glance at your company's financial health for {user?.company_name}.
+          Budgeted performance comparison for {user?.company_name} (2024 vs 2025).
         </Typography>
 
-        <FormControl sx={{ mb: 4, minWidth: 140 }} size="small">
-          <InputLabel>Year</InputLabel>
-          <Select
-            value={year}
-            label="Year"
-            onChange={(e) => setYear(e.target.value)}
-          >
-            {[2023, 2024, 2025].map((y) => (
-              <MenuItem key={y} value={y}>{y}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item>
+            <Chip label={`Gross Margin (2025): ${marginRatio}%`} color="success" variant="outlined" />
+          </Grid>
+        </Grid>
 
         {loading ? (
           <CircularProgress />
         ) : (
           <>
             <Grid container spacing={3}>
-              {importantMetrics.map(({ label, value }, index) => (
+              {importantMetrics.map((label, index) => (
                 <Grid item xs={12} sm={6} md={3} key={label}>
                   <Card>
                     <Typography variant="subtitle2" color="text.secondary">
-                      {label}
+                      {label.replace(/_/g, ' ').toUpperCase()}
                     </Typography>
                     <Typography variant="h6" sx={{ color: COLORS[index % COLORS.length], fontWeight: 700 }}>
-                      {value?.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                      {summary2025?.[label]?.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      (2024: {summary2024?.[label]?.toLocaleString('en-MY', { minimumFractionDigits: 2 })})
                     </Typography>
                   </Card>
                 </Grid>
@@ -125,23 +126,23 @@ const DashboardPage = () => {
             </Grid>
 
             <Box mt={6}>
-              <SectionTitle variant="h6">PNL Breakdown Overview</SectionTitle>
-              <Paper sx={{ p: 3, height: 360, borderRadius: 4, backgroundColor: '#fff', mb: 4 }}>
+              <SectionTitle variant="h6">PNL Breakdown (2024 vs 2025)</SectionTitle>
+              <Paper sx={{ p: 3, height: 360, borderRadius: 4, backgroundColor: '#ffffff', mb: 4 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={barData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" tick={{ fill: '#4b4b4b' }} />
                     <YAxis tick={{ fill: '#4b4b4b' }} />
                     <Tooltip formatter={(val) => val.toLocaleString('en-MY', { minimumFractionDigits: 2 })} />
-                    <Bar dataKey="value" fill="#b5c7bd">
-                      <LabelList dataKey="value" position="top" formatter={(val) => val.toLocaleString('en-MY')} />
-                    </Bar>
+                    <Legend />
+                    <Bar dataKey="2025" fill="#7a94a6" />
+                    <Bar dataKey="2024" fill="#d4a5a5" />
                   </BarChart>
                 </ResponsiveContainer>
               </Paper>
 
-              <SectionTitle variant="h6">Profit Composition</SectionTitle>
-              <Paper sx={{ p: 3, height: 360, borderRadius: 4, backgroundColor: '#fff' }}>
+              <SectionTitle variant="h6">Profit Composition (2025)</SectionTitle>
+              <Paper sx={{ p: 3, height: 360, borderRadius: 4, backgroundColor: '#ffffff' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
