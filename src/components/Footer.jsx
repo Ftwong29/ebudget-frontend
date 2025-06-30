@@ -35,7 +35,7 @@ const Footer = () => {
       {/* Footer 版权信息 */}
       <FooterContainer>
         <Typography variant="body2" color="textSecondary">
-          © {new Date().getFullYear()} eBudget. All rights reserved. | Version 0.2.4
+          © {new Date().getFullYear()} eBudget. All rights reserved. | Version 0.2.5
         </Typography>
       </FooterContainer>
 

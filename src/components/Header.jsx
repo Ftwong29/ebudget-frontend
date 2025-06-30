@@ -89,6 +89,7 @@ const Header = () => {
           >
             <MenuItem onClick={() => { navigate('/budget-input'); handleFunctionMenuClose(); }}>Budget Input</MenuItem>
             <MenuItem onClick={() => { navigate('/budget-upload'); handleFunctionMenuClose(); }}>Budget Upload</MenuItem>
+            <MenuItem onClick={() => { navigate('/ppe-input'); handleFunctionMenuClose(); }}>PPE Input</MenuItem>
           </Menu>
 
           {/* Report Dropdown */}

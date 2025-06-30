@@ -2,12 +2,12 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import PrivateRoute from './PrivateRoute';
 import BudgetInputPage from '../pages/BudgetInputPage';
-import BudgetUploadPage from '../pages/BudgetUploadPage'; // ✅ 新增导入
+import BudgetUploadPage from '../pages/BudgetUploadPage';
+import PPEInputPage from '../pages/PPEInputPage'; // ✅ 新增导入
 import LoginPage from '../pages/Login';
 import DashboardPage from '../pages/Dashboard';
 import ReportPNL from '../pages/ReportPNL';
-import ReportPNLSummary from '../pages/ReportPNLSummary'; // ✅ 新增
-
+import ReportPNLSummary from '../pages/ReportPNLSummary';
 
 const Router = () => {
   return (
@@ -42,6 +42,14 @@ const Router = () => {
           }
         />
         <Route
+          path="/ppe-input"
+          element={
+            <PrivateRoute>
+              <PPEInputPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/report/pnl"
           element={
             <PrivateRoute>
@@ -57,7 +65,6 @@ const Router = () => {
             </PrivateRoute>
           }
         />
-
       </Route>
 
       {/* Catch all unmatched routes */}
