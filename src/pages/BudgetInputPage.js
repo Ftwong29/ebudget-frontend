@@ -301,99 +301,110 @@ const BudgetInputPage = () => {
 
       <Dialog open={open} onClose={handleCloseDialog} fullWidth maxWidth="md">
         <DialogTitle>Monthly Details: {selectedItem?.gl_account_long_name}</DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
-          <Grid container spacing={2}>
-            {months.map((month) => {
-              const glCode = selectedItem?.gl_code;
-              const relatedVal = relatedValues[glCode]?.[month];
-              const prevVal = previousValues[glCode]?.[month];
 
-              const showRelated = relatedVal !== null && relatedVal !== undefined && parseFloat(relatedVal) !== 0;
-              const showPrev = prevVal !== null && prevVal !== undefined && parseFloat(prevVal) !== 0;
+<DialogContent sx={{ py: 0 }}>
+  {/* ✅ 加入 padding 容器确保底部按钮与总和有足够空隙，避免遮挡 */}
+  <Box sx={{ maxHeight: '65vh', overflowY: 'auto', px: 3, pt: 3 }}>
+    <Grid container spacing={2}>
+      {months.map((month) => {
+        const glCode = selectedItem?.gl_code;
+        const relatedVal = relatedValues[glCode]?.[month];
+        const prevVal = previousValues[glCode]?.[month];
 
-              return (
-                <Grid item xs={3} key={month}>
-                  <TextField
-                    label={month}
-                    type="number"
-                    size="small"
-                    fullWidth
-                    value={inputValues[glCode]?.[month] || ''}
-                    onChange={(e) => handleInputChange(glCode, month, e.target.value)}
-                  />
+        const showRelated = relatedVal !== null && relatedVal !== undefined && parseFloat(relatedVal) !== 0;
+        const showPrev = prevVal !== null && prevVal !== undefined && parseFloat(prevVal) !== 0;
 
-                  {showRelated && (
-                    <Box
-                      mt={0.5}
-                      px={1}
-                      py={0.25}
-                      borderRadius={1}
-                      bgcolor="#e3f2fd"
-                      fontSize={12}
-                      color="text.secondary"
-                    >
-                      Related: {formatNumber(parseFloat(relatedVal))}
-                    </Box>
-                  )}
+        return (
+          <Grid item xs={12} sm={6} md={3} key={month} sx={{ scrollMarginTop: '100px' }}>
+            <TextField
+              label={month}
+              type="number"
+              size="small"
+              fullWidth
+              value={inputValues[glCode]?.[month] || ''}
+              onChange={(e) => handleInputChange(glCode, month, e.target.value)}
+            />
 
-                  {showPrev && (
-                    <Box
-                      mt={0.5}
-                      px={1}
-                      py={0.25}
-                      borderRadius={1}
-                      bgcolor="#f5f5f5"
-                      fontSize={12}
-                      color="text.secondary"
-                    >
-                      Prev: {formatNumber(parseFloat(prevVal))}
-                    </Box>
-                  )}
-                </Grid>
-              );
-            })}
-
-          </Grid>
-
-          {selectedCategory === 'Related' && (
-            <Box
-              mt={4}
-              p={2}
-              border={1}
-              borderRadius={2}
-              borderColor="divider"
-              bgcolor="#fafafa"
-              display="flex"
-              flexDirection={{ xs: 'column', sm: 'row' }}
-              gap={2}
-            >
-              <Autocomplete
-                fullWidth
-                options={[...new Set(groupedCompanies.map(gc => gc.company_name))]}
-                value={selectedCompany}
-                onChange={(e, value) => setSelectedCompany(value || '')}
-                renderInput={(params) => (
-                  <TextField {...params} label="Company" variant="outlined" size="small" />
-                )}
-              />
-              <TextField
-                select
-                label="Profit Center"
-                size="small"
-                fullWidth
-                value={selectedProfitCenter}
-                onChange={e => handleProfitCenterChange(e.target.value, selectedItem?.gl_code)}
-                disabled={!selectedCompany}
-                SelectProps={{ native: true }}
+            {showRelated && (
+              <Box
+                mt={0.5}
+                px={1}
+                py={0.25}
+                borderRadius={1}
+                bgcolor="#e3f2fd"
+                fontSize={12}
+                color="text.secondary"
               >
-                {availableProfitCenters.map(pc => (
-                  <option key={pc} value={pc}>{pc}</option>
-                ))}
-              </TextField>
+                Related: {formatNumber(parseFloat(relatedVal))}
+              </Box>
+            )}
 
-            </Box>
-          )}
-        </DialogContent>
+            {showPrev && (
+              <Box
+                mt={0.5}
+                px={1}
+                py={0.25}
+                borderRadius={1}
+                bgcolor="#f5f5f5"
+                fontSize={12}
+                color="text.secondary"
+              >
+                Prev: {formatNumber(parseFloat(prevVal))}
+              </Box>
+            )}
+          </Grid>
+        );
+      })}
+    </Grid>
+
+    {/* ✅ 实时总和展示 */}
+    {selectedItem && (
+      <Box mt={4} textAlign="right">
+        <Typography variant="h6">
+          Total: {formatNumber(calculateItemTotal(selectedItem.gl_code))}
+        </Typography>
+      </Box>
+    )}
+  </Box>
+
+  {/* 相关公司选择器（保持原状） */}
+  {selectedCategory === 'Related' && (
+    <Box
+      mt={4}
+      px={3}
+      pb={2}
+      display="flex"
+      flexDirection={{ xs: 'column', sm: 'row' }}
+      gap={2}
+    >
+      <Autocomplete
+        fullWidth
+        options={[...new Set(groupedCompanies.map(gc => gc.company_name))]}
+        value={selectedCompany}
+        onChange={(e, value) => setSelectedCompany(value || '')}
+        renderInput={(params) => (
+          <TextField {...params} label="Company" variant="outlined" size="small" />
+        )}
+      />
+      <TextField
+        select
+        label="Profit Center"
+        size="small"
+        fullWidth
+        value={selectedProfitCenter}
+        onChange={e => handleProfitCenterChange(e.target.value, selectedItem?.gl_code)}
+        disabled={!selectedCompany}
+        SelectProps={{ native: true }}
+      >
+        {availableProfitCenters.map(pc => (
+          <option key={pc} value={pc}>{pc}</option>
+        ))}
+      </TextField>
+    </Box>
+  )}
+</DialogContent>
+
+
 
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button variant="outlined" onClick={handleCloseDialog}>Close</Button>
