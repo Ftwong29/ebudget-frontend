@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import CryptoJS from 'crypto-js';
 
 const secretKey = process.env.REACT_APP_SECRET_KEY;
-const budgetCategories = ['Sales', 'Cost', 'NonOperating', 'Direct', 'Indirect', 'Manpower','Interest','Taxation','Depreciation', 'Related'];
+const budgetCategories = ['Sales', 'Cost', 'NonOperating', 'Direct', 'Indirect', 'Manpower','Int, Tax, Depr.', 'Related'];
 
 const BudgetInputPage = () => {
   const { user } = useSelector((state) => state.auth);
@@ -95,6 +95,7 @@ const BudgetInputPage = () => {
   const fetchGLData = async (category) => {
     setLoading(true);
     try {
+  
       const res = await axiosInstance.get(`/gl/glinput-category`, {
         params: { category: category.toLowerCase() }
       });

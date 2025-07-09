@@ -1,175 +1,185 @@
+// Dashboard.js
 import React, { useEffect, useState } from 'react';
-import {
-  Box, Typography, Grid, Paper, CircularProgress, Chip, Divider
-} from '@mui/material';
-import { styled } from '@mui/material/styles';
-import { useSelector } from 'react-redux';
 import axiosInstance from '../api/axiosInstance';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList, PieChart, Pie, Cell, Legend
-} from 'recharts';
+  Box, Typography, Grid, Card, CardContent, CircularProgress
+} from '@mui/material';
+import { Bar, Pie } from 'react-chartjs-2';
+import {
+  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement
+} from 'chart.js';
 
-const MainContainer = styled(Box)(({ theme }) => ({
-  minHeight: '100vh',
-  backgroundColor: '#f0efeb',
-  display: 'flex',
-  flexDirection: 'column',
-}));
+import { useSelector } from 'react-redux';
 
-const Card = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(3),
-  borderRadius: 16,
-  backgroundColor: '#fffaf5',
-  boxShadow: '0 6px 24px rgba(0,0,0,0.08)',
-  height: '100%',
-  transition: 'transform 0.3s ease',
-  '&:hover': {
-    transform: 'scale(1.02)',
-  },
-}));
+ChartJS.register(
+  CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
+  ArcElement
+);
 
-const SectionTitle = styled(Typography)(({ theme }) => ({
-  color: '#6d726f',
-  fontWeight: 600,
-  marginBottom: theme.spacing(2),
-}));
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const COLORS = ['#7a94a6', '#b5c7bd', '#d4a5a5', '#c5a880', '#a9a9b3'];
-
-const DashboardPage = () => {
+const Dashboard = () => {
   const { user } = useSelector((state) => state.auth);
-  const [summary2025, setSummary2025] = useState(null);
-  const [summary2024, setSummary2024] = useState(null);
+  const [data2024, setData2024] = useState([]);
+  const [data2025, setData2025] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchSummaries = async () => {
+    const fetchPNL = async () => {
       try {
-        const [res2025, res2024] = await Promise.all([
-          axiosInstance.get('/report/pnl-summary', {
-            params: { glyear: 2025, company: user?.company_name },
+        const [res2024, res2025] = await Promise.all([
+          axiosInstance.get('/report/pnl', {
+            params: {
+              glyear: 2024,
+              company: user?.company_name,
+              _: Date.now()
+            }
           }),
-          axiosInstance.get('/report/pnl-summary', {
-            params: { glyear: 2024, company: user?.company_name },
-          }),
+          axiosInstance.get('/report/pnl', {
+            params: {
+              glyear: 2025,
+              company: user?.company_name,
+              _: Date.now()
+            }
+          })
         ]);
-        setSummary2025(res2025.data.summary);
-        setSummary2024(res2024.data.summary);
+        setData2024(res2024.data.data || []);
+        setData2025(res2025.data.data || []);
       } catch (err) {
-        console.error('Failed to fetch summary reports', err);
+        console.error('Failed to fetch PNL data', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchSummaries();
+    fetchPNL();
   }, [user]);
 
-  const importantMetrics = [
-    'revenue',
-    'gross_profit',
-    'net_profit_after_tax',
-    'retained_profit_carried_forward'
-  ];
+  const getYTD = (values) => months.reduce((sum, m) => sum + (parseFloat(values[m]) || 0), 0);
 
-  const marginRatio = summary2025 && summary2025.revenue
-    ? (summary2025.gross_profit / summary2025.revenue * 100).toFixed(1)
-    : '0.0';
+  const getYTDByLvl1 = (data, lvl1) =>
+    data.filter(r => r.lvl1 === lvl1).reduce((sum, r) => sum + getYTD(r.values), 0);
 
-  const barData = importantMetrics.map((key) => ({
-    name: key.replace(/_/g, ' ').toUpperCase(),
-    '2025': summary2025?.[key] || 0,
-    '2024': summary2024?.[key] || 0,
-  }));
+  const getYTDByName = (data, keyword) => {
+    const match = data.find(r => r.gl_account_long_name.toLowerCase().includes(keyword.toLowerCase()));
+    return match ? getYTD(match.values) : 0;
+  };
 
-  const pieData = [
-    { name: 'Revenue', value: summary2025?.revenue || 0 },
-    { name: 'Gross Profit', value: summary2025?.gross_profit || 0 },
-    { name: 'Net Profit', value: summary2025?.net_profit_after_tax || 0 },
-  ];
+  const revenueThisYear = getYTDByLvl1(data2025, 1);
+  const revenueLastYear = getYTDByLvl1(data2024, 1);
+  const costThisYear = data2025
+    .filter(r => r.sub1 === 'COST OF SALES' && r.gl_code !== 'FORMULA')
+    .reduce((sum, r) => sum + getYTD(r.values), 0);
+
+  const costLastYearData = data2024
+    .filter(r => r.sub1 === 'COST OF SALES' && r.gl_code !== 'FORMULA');
+
+    console.log('[COST OF SALES] Last Year Breakdown:',
+      costLastYearData
+        .map(r => ({ code: r.gl_code, name: r.gl_account_long_name, ytd: getYTD(r.values) }))
+        .filter(r => r.ytd !== 0)
+    );
+    
+
+  const costLastYear = costLastYearData.reduce((sum, r) => sum + getYTD(r.values), 0);
+  const gpThisYear = getYTDByName(data2025, 'gross profit');
+  const gpLastYear = getYTDByName(data2024, 'gross profit');
+  const npThisYear = getYTDByName(data2025, 'net profit after tax');
+  const npLastYear = getYTDByName(data2024, 'net profit after tax');
+
+  const expenseBreakdown = data2025.filter(item => item.lvl1 === 4 || item.lvl1 === 5);
+
+  const summaryCard = (title, value, lastYear, color = 'primary.main') => {
+    const diff = value - lastYear;
+    const pct = lastYear !== 0 ? (diff / Math.abs(lastYear)) * 100 : 0;
+    const trendColor = pct > 0 ? 'green' : pct < 0 ? 'red' : 'gray';
+
+    return (
+      <Grid item xs={12} sm={6} md={3}>
+        <Card sx={{ borderLeft: `6px solid`, borderColor: color }}>
+          <CardContent>
+            <Typography variant="subtitle2" color="text.secondary">{title}</Typography>
+            <Typography variant="h6">
+              {value.toLocaleString(undefined, { minimumFractionDigits: 2 })} M
+            </Typography>
+            <Typography variant="body2" sx={{ color: trendColor }}>
+              ({pct.toFixed(1)}%) vs 去年
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
+    );
+  };
+
+  const expensePieData = {
+    labels: expenseBreakdown.map(i => i.sub1),
+    datasets: [{
+      data: expenseBreakdown.map(i => getYTD(i.values)),
+      backgroundColor: [
+        '#42a5f5', '#66bb6a', '#ffa726', '#ab47bc', '#ff7043', '#26c6da'
+      ]
+    }]
+  };
+
+  const categoryLabels = [...new Set([
+    ...data2024,
+    ...data2025
+  ].filter(i => i.sub1 === 'REVENUE').map(i => i.sub_title))];
+
+  const groupByYearAndTitle = (dataset) => {
+    return categoryLabels.map(title => {
+      const match = dataset.find(i => i.sub_title === title && i.sub1 === 'REVENUE');
+      return match ? getYTD(match.values) : 0;
+    });
+  };
+
+  const revenueCategoryBarData = {
+    labels: categoryLabels,
+    datasets: [
+      {
+        label: '去年',
+        data: groupByYearAndTitle(data2024),
+        backgroundColor: '#90caf9'
+      },
+      {
+        label: '今年',
+        data: groupByYearAndTitle(data2025),
+        backgroundColor: '#1976d2'
+      }
+    ]
+  };
+
+  if (loading) return <CircularProgress sx={{ mt: 10 }} />;
 
   return (
-    <MainContainer>
-      <Box sx={{ p: 4 }}>
-        <Typography variant="h4" sx={{ mb: 1, fontWeight: 600, color: '#4d4f4c' }}>
-          📊 Financial Dashboard
-        </Typography>
-        <Typography variant="body1" sx={{ color: '#757875', mb: 3 }}>
-          Budgeted performance comparison for {user?.company_name} (2024 vs 2025).
-        </Typography>
+    <Box sx={{ p: 4 }}>
+      <Typography variant="h4" sx={{ mb: 4 }}>📊 Financial Dashboard</Typography>
 
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item>
-            <Chip label={`Gross Margin (2025): ${marginRatio}%`} color="success" variant="outlined" />
-          </Grid>
+      <Grid container spacing={3}>
+        {summaryCard('Revenue', revenueThisYear, revenueLastYear)}
+        {summaryCard('Cost of Sales', costThisYear, costLastYear, 'error.main')}
+        {summaryCard('Gross Profit', gpThisYear, gpLastYear, 'success.main')}
+        {summaryCard('Net Profit', npThisYear, npLastYear, 'secondary.main')}
+
+        {/* <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom>Expense Breakdown</Typography>
+              <Pie data={expensePieData} />
+            </CardContent>
+          </Card>
         </Grid>
 
-        {loading ? (
-          <CircularProgress />
-        ) : (
-          <>
-            <Grid container spacing={3}>
-              {importantMetrics.map((label, index) => (
-                <Grid item xs={12} sm={6} md={3} key={label}>
-                  <Card>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      {label.replace(/_/g, ' ').toUpperCase()}
-                    </Typography>
-                    <Typography variant="h6" sx={{ color: COLORS[index % COLORS.length], fontWeight: 700 }}>
-                      {summary2025?.[label]?.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      (2024: {summary2024?.[label]?.toLocaleString('en-MY', { minimumFractionDigits: 2 })})
-                    </Typography>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-
-            <Box mt={6}>
-              <SectionTitle variant="h6">PNL Breakdown (2024 vs 2025)</SectionTitle>
-              <Paper sx={{ p: 3, height: 360, borderRadius: 4, backgroundColor: '#ffffff', mb: 4 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fill: '#4b4b4b' }} />
-                    <YAxis tick={{ fill: '#4b4b4b' }} />
-                    <Tooltip formatter={(val) => val.toLocaleString('en-MY', { minimumFractionDigits: 2 })} />
-                    <Legend />
-                    <Bar dataKey="2025" fill="#7a94a6" />
-                    <Bar dataKey="2024" fill="#d4a5a5" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Paper>
-
-              <SectionTitle variant="h6">Profit Composition (2025)</SectionTitle>
-              <Paper sx={{ p: 3, height: 360, borderRadius: 4, backgroundColor: '#ffffff' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={120}
-                      fill="#8884d8"
-                      label={({ name }) => name}
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(val) => val.toLocaleString('en-MY', { minimumFractionDigits: 2 })} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Paper>
-            </Box>
-          </>
-        )}
-      </Box>
-    </MainContainer>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom>Revenue by Product Category</Typography>
+              <Bar data={revenueCategoryBarData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
+            </CardContent>
+          </Card>
+        </Grid> */}
+      </Grid>
+    </Box>
   );
 };
 
-export default DashboardPage;
+export default Dashboard;

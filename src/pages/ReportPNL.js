@@ -44,13 +44,15 @@ function buildTree(records, months, calculateYTD) {
       });
     });
   });
-  return Object.values(lvl1Map).map(lvl1 => ({
-    ...lvl1,
-    lvl2s: Object.values(lvl1.lvl2s).map(lvl2 => ({
-      ...lvl2,
-      lvl3s: Object.values(lvl2.lvl3s)
-    }))
-  }));
+  return Object.values(lvl1Map)
+    .sort((a, b) => a.lvl1 - b.lvl1)
+    .map(lvl1 => lvl1.isFormula ? lvl1 : {
+      ...lvl1,
+      lvl2s: Object.values(lvl1.lvl2s).map(lvl2 => ({
+        ...lvl2,
+        lvl3s: Object.values(lvl2.lvl3s)
+      }))
+    });
 }
 
 const ReportPNL = () => {
@@ -102,14 +104,7 @@ const ReportPNL = () => {
     : records;
 
   const treeData = useMemo(() => buildTree(visibleRecords, months, calculateYTD), [visibleRecords]);
-  const overallTotals = useMemo(() => {
-    const t = { YTD: 0, ...months.reduce((acc, m) => { acc[m] = 0; return acc; }, {}) };
-    visibleRecords.forEach(item => {
-      months.forEach(m => { t[m] += parseFloat(item.values[m] || 0); });
-      t.YTD += calculateYTD(item.values);
-    });
-    return t;
-  }, [visibleRecords]);
+  
 
   // ========== 一键展开/收起 ==========
   const getAllExpandableKeys = (tree) => {
@@ -169,40 +164,50 @@ const ReportPNL = () => {
   function renderTree({ lvl1, sub1, lvl2s, YTD, months: m1 }, lvl = 1) {
     const key1 = lvl1;
     const rows = [];
+  
+    const isFormulaRow = !Number.isInteger(parseFloat(lvl1));
+  
+    const colorLvl1 = isFormulaRow ? '#fdf6e3' : '#bbdefb';
+    const colorLvl2 = '#cfe2f3';
+    const colorLvl3 = '#e6f0fa';
+  
     rows.push(
       <motion.tr key={key1} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-        <TableCell colSpan={2} sx={{ backgroundColor: '#c8e6c9', fontWeight: 600 }}>
-          <IconButton size="small" onClick={() => toggleExpand(key1)}>
-            {expanded[key1] ? <ExpandMore /> : <ChevronRight />}
-          </IconButton>
-          {[`[lvl1-${lvl1}]`, sub1].filter(Boolean).join(' ')}
+        <TableCell colSpan={2} sx={{ backgroundColor: colorLvl1, fontWeight: 600 }}>
+          {!isFormulaRow && (
+            <IconButton size="small" onClick={() => toggleExpand(key1)}>
+              {expanded[key1] ? <ExpandMore /> : <ChevronRight />}
+            </IconButton>
+          )}
+          {[sub1].filter(Boolean).join(' ')}
         </TableCell>
-        <TableCell align="right" sx={{ backgroundColor: '#c8e6c9', fontWeight: 600 }}>
+        <TableCell align="right" sx={{ backgroundColor: colorLvl1, fontWeight: 800 }}>
           {YTD.toLocaleString(undefined, { minimumFractionDigits: 2 })}
         </TableCell>
         {months.map(month => (
-          <TableCell key={month} align="right" sx={{ backgroundColor: '#c8e6c9', fontWeight: 600 }}>
+          <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl1, fontWeight: 600 }}>
             {m1[month].toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </TableCell>
         ))}
       </motion.tr>
     );
-    if (expanded[key1]) {
+  
+    if (expanded[key1] && !isFormulaRow) {
       lvl2s.forEach(lvl2 => {
         const k2 = `${lvl1}-${lvl2.lvl2}`;
         rows.push(
           <motion.tr key={k2} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <TableCell colSpan={2} sx={{ pl: 3, backgroundColor: '#e8f5e9', fontWeight: 500 }}>
+            <TableCell colSpan={2} sx={{ pl: 3, backgroundColor: colorLvl2, fontWeight: 500 }}>
               <IconButton size="small" onClick={() => toggleExpand(k2)}>
                 {expanded[k2] ? <ExpandMore /> : <ChevronRight />}
               </IconButton>
-              {[`[lvl2-${lvl2.lvl2}]`, lvl2.sub2].filter(Boolean).join(' ')}
+              {[lvl2.sub2].filter(Boolean).join(' ')}
             </TableCell>
-            <TableCell align="right" sx={{ backgroundColor: '#e8f5e9', fontWeight: 500 }}>
+            <TableCell align="right" sx={{ backgroundColor: colorLvl2, fontWeight: 800 }}>
               {lvl2.YTD.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </TableCell>
             {months.map(month => (
-              <TableCell key={month} align="right" sx={{ backgroundColor: '#e8f5e9', fontWeight: 500 }}>
+              <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl2, fontWeight: 500 }}>
                 {lvl2.months[month].toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </TableCell>
             ))}
@@ -213,29 +218,32 @@ const ReportPNL = () => {
             const k3 = `${lvl1}-${lvl2.lvl2}-${lvl3.lvl3}`;
             rows.push(
               <motion.tr key={k3} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <TableCell colSpan={2} sx={{ pl: 6, backgroundColor: '#f1f8e9', fontWeight: 500, color: 'gray' }}>
+                <TableCell colSpan={2} sx={{ pl: 6, backgroundColor: colorLvl3, fontWeight: 500, color: 'gray' }}>
                   <IconButton size="small" onClick={() => toggleExpand(k3)}>
                     {expanded[k3] ? <ExpandMore /> : <ChevronRight />}
                   </IconButton>
-                  {[`[lvl3-${lvl3.lvl3}]`, lvl3.sub_title].filter(Boolean).join(' ')}
+                  {[lvl3.sub_title].filter(Boolean).join(' ')}
                 </TableCell>
-                <TableCell align="right" sx={{ backgroundColor: '#f1f8e9', fontWeight: 500, color: 'gray' }}>
+                <TableCell align="right" sx={{ backgroundColor: colorLvl3, fontWeight: 800, color: 'gray' }}>
                   {lvl3.YTD.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </TableCell>
                 {months.map(month => (
-                  <TableCell key={month} align="right" sx={{ backgroundColor: '#f1f8e9', fontWeight: 500, color: 'gray' }}>
+                  <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl3, fontWeight: 500, color: 'gray' }}>
                     {lvl3.months[month].toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </TableCell>
                 ))}
               </motion.tr>
             );
+  
             if (expanded[k3]) {
               lvl3.details.forEach((item, idx) => {
                 rows.push(
                   <motion.tr key={item.gl_code + '_' + idx} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                    <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: '#fff' }}>{item.gl_code}</TableCell>
-                    <TableCell sx={{ position: 'sticky', left: 100, backgroundColor: '#fff' }}>{item.gl_account_long_name}</TableCell>
-                    <TableCell align="right">{calculateYTD(item.values).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: '#ffffff' }}>{item.gl_code}</TableCell>
+                    <TableCell sx={{ position: 'sticky', left: 100, backgroundColor: '#ffffff' }}>{item.gl_account_long_name}</TableCell>
+                    <TableCell align="right" sx={{ backgroundColor: '#ffffff', fontWeight: 700 }}>
+                      {calculateYTD(item.values).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </TableCell>
                     {months.map(month => (
                       <TableCell key={month} align="right">
                         {(parseFloat(item.values[month]) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -251,7 +259,8 @@ const ReportPNL = () => {
     }
     return rows;
   }
-
+  
+  
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" sx={{ mb: 2 }}>P&L Report (2025)</Typography>
@@ -315,17 +324,6 @@ const ReportPNL = () => {
               ) : (
                 treeData.map(lvl1Node => renderTree(lvl1Node))
               )
-            )}
-            {(!loading && !switching) && (
-              <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ backgroundColor: '#dcedc8' }}>
-                <TableCell colSpan={2} align="right" sx={{ fontWeight: 'bold' }}>Overall Total</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold' }}>{overallTotals.YTD.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                {months.map(month => (
-                  <TableCell key={month} align="right" sx={{ fontWeight: 'bold' }}>
-                    {overallTotals[month].toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </TableCell>
-                ))}
-              </motion.tr>
             )}
           </TableBody>
         </Table>
