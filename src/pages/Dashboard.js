@@ -4,15 +4,18 @@ import axiosInstance from '../api/axiosInstance';
 import {
   Box, Typography, Grid, Card, CardContent, CircularProgress, FormControlLabel, Switch
 } from '@mui/material';
-import { Bar } from 'react-chartjs-2';
+import { Bar,Line } from 'react-chartjs-2';
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend
+  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
+  LineElement,        // ✅ 加这个
+  PointElement,       // ✅ 加这个
 } from 'chart.js';
-
 import { useSelector } from 'react-redux';
 
 ChartJS.register(
-  CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend
+  CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
+  LineElement,      // 👈 新增
+  PointElement,     // 👈 新增
 );
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -22,7 +25,8 @@ const Dashboard = () => {
   const [data2024, setData2024] = useState([]);
   const [data2025, setData2025] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showZero, setShowZero] = useState(true);
+  const [showZero, setShowZero] = useState(false);
+
 
   useEffect(() => {
     const fetchPNL = async () => {
@@ -73,17 +77,60 @@ const Dashboard = () => {
       <Grid item xs={12} sm={6} md={3}>
         <Card sx={{ borderLeft: `6px solid`, borderColor: color }}>
           <CardContent>
-            <Typography variant="subtitle2" color="text.secondary">{title}</Typography>
-            <Typography variant="body2">{value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Typography>
-            <Typography variant="body2" sx={{ color: trendColor }}>({pct.toFixed(1)}%)</Typography>
+            <Typography variant="subtitle2" color="text.secondary">
+              {title}
+            </Typography>
+
+            {/* This Year */}
+            <Typography variant="h6" sx={{ mt: 1 }}>
+              {value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </Typography>
+
+            {/* Last Year */}
+            <Typography variant="body2" color="text.disabled">
+              Last Year: {lastYear.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </Typography>
+
+            {/* Difference Percentage */}
+            <Typography variant="body2" sx={{ color: trendColor }}>
+              ({pct.toFixed(1)}%)
+            </Typography>
           </CardContent>
         </Card>
       </Grid>
     );
   };
 
+
   const revenueThisYear = getYTDByLvl1(data2025, 1);
   const revenueLastYear = getYTDByLvl1(data2024, 1);
+
+  const directExpensesLastYear = getYTDByLvl1(data2024, 4);
+  const directExpensesThisYear = getYTDByLvl1(data2025, 4);
+  
+
+  const revenueVsDirectLineChartData = {
+    labels: ['2024', '2025'],
+    datasets: [
+      {
+        label: 'Revenue',
+        data: [revenueLastYear, revenueThisYear],
+        borderColor: '#1976d2',
+        backgroundColor: '#1976d2',
+        tension: 0.3
+      },
+      {
+        label: 'Direct Expenses',
+        data: [directExpensesLastYear, directExpensesThisYear],
+        borderColor: '#ffa726',
+        backgroundColor: '#ffa726',
+        tension: 0.3
+      }
+    ]
+  };
+
+
+
   const costThisYear = data2025
     .filter(r => r.sub1 === 'COST OF SALES' && r.gl_code !== 'FORMULA')
     .reduce((sum, r) => sum + getYTD(r.values), 0);
@@ -114,19 +161,20 @@ const Dashboard = () => {
     labels: visibleLabels,
     datasets: [
       {
-        label: '2024',
-        data: visibleLabels.map(category => getYTDForCategory(data2024, category)),
-        backgroundColor: '#90caf9'
-      },
-      {
         label: '2025',
         data: visibleLabels.map(category => getYTDForCategory(data2025, category)),
         backgroundColor: '#1976d2'
+      },
+      {
+        label: '2024',
+        data: visibleLabels.map(category => getYTDForCategory(data2024, category)),
+        backgroundColor: '#90caf9'
       }
+
     ]
   };
 
-  
+
   const allMaintenance = [...data2024, ...data2025]
     .filter(item => item.lvl1 === 2 && item.lvl2 === 3 && item.lvl3 === 1);
 
@@ -141,17 +189,46 @@ const Dashboard = () => {
     labels: maintenanceLabels,
     datasets: [
       {
-        label: '2024',
-        data: maintenanceLabels.map(name => getYTD(data2024.find(i => i.gl_account_short_name === name)?.values || {})),
-        backgroundColor: '#90caf9'
-      },
-      {
         label: '2025',
         data: maintenanceLabels.map(name => getYTD(data2025.find(i => i.gl_account_short_name === name)?.values || {})),
         backgroundColor: '#1976d2'
+      },
+      {
+        label: '2024',
+        data: maintenanceLabels.map(name => getYTD(data2024.find(i => i.gl_account_short_name === name)?.values || {})),
+        backgroundColor: '#90caf9'
       }
+
     ]
   };
+
+  const allExpensesBreakdown = [...data2024, ...data2025]
+  .filter(item => item.lvl1 === 5);
+
+const ExpensesBreakdownLabels = [...new Set(allExpensesBreakdown.map(i => i.sub_title))]
+  .filter(name => {
+    const val2024 = getYTD(data2024.find(i => i.sub_title === name)?.values || {});
+    const val2025 = getYTD(data2025.find(i => i.sub_title === name)?.values || {});
+    return showZero || val2024 !== 0 || val2025 !== 0;
+  });
+
+const ExpensesBreakdownChartData = {
+  labels: ExpensesBreakdownLabels,
+  datasets: [
+    {
+      label: '2025',
+      data: ExpensesBreakdownLabels.map(name => getYTD(data2025.find(i => i.sub_title === name)?.values || {})),
+      backgroundColor: '#1976d2'
+    },
+    {
+      label: '2024',
+      data: ExpensesBreakdownLabels.map(name => getYTD(data2024.find(i => i.sub_title === name)?.values || {})),
+      backgroundColor: '#90caf9'
+    }
+
+  ]
+};
+
 
   if (loading) return <CircularProgress sx={{ mt: 10 }} />;
 
@@ -208,6 +285,60 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </Grid>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                Revenue vs. Direct Expenses Trend
+              </Typography>
+              <Line
+                data={revenueVsDirectLineChartData}
+                options={{
+                  responsive: true,
+                  plugins: {
+                    legend: { position: 'top' },
+                    title: { display: false }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        callback: function (value) {
+                          return value.toLocaleString();
+                        }
+                      }
+                    }
+                  }
+                }}
+              />
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="subtitle1">Expenses Breakdown</Typography>
+                <FormControlLabel
+                  control={<Switch checked={showZero} onChange={(e) => setShowZero(e.target.checked)} />}
+                  label="Show Zero"
+                />
+              </Box>
+              <Bar
+                data={ExpensesBreakdownChartData}
+                options={{
+                  indexAxis: 'y',
+                  responsive: true,
+                  plugins: {
+                    legend: { position: 'top' },
+                    title: { display: false }
+                  }
+                }}
+              />
+            </CardContent>
+          </Card>
+        </Grid>
+
       </Grid>
     </Box>
   );

@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import CryptoJS from 'crypto-js';
 
 const secretKey = process.env.REACT_APP_SECRET_KEY;
-const budgetCategories = ['Sales', 'Cost', 'NonOperating', 'Direct', 'Indirect', 'Manpower','Int, Tax, Depr.', 'Related'];
+const budgetCategories = ['Sales','Trustee', 'Cost', 'NonOperating', 'Direct', 'Indirect', 'Manpower','Int, Tax, Depr.', 'Related'];
 
 const BudgetInputPage = () => {
   const { user } = useSelector((state) => state.auth);
