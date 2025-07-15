@@ -4,7 +4,7 @@ import axiosInstance from '../api/axiosInstance';
 import {
   Box, Typography, Grid, Card, CardContent, CircularProgress, FormControlLabel, Switch
 } from '@mui/material';
-import { Bar,Line } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
   LineElement,        // ✅ 加这个
@@ -107,7 +107,21 @@ const Dashboard = () => {
 
   const directExpensesLastYear = getYTDByLvl1(data2024, 4);
   const directExpensesThisYear = getYTDByLvl1(data2025, 4);
-  
+
+  const getMonthlyByLvl1 = (data, lvl1) => {
+    return months.map(m => {
+      return data
+        .filter(r => r.lvl1 === lvl1)
+        .reduce((sum, r) => sum + (parseFloat(r.values[m]) || 0), 0);
+    });
+  };
+
+  const revenue2024Monthly = getMonthlyByLvl1(data2024, 1);
+  const revenue2025Monthly = getMonthlyByLvl1(data2025, 1);
+  const direct2024Monthly = getMonthlyByLvl1(data2024, 4);
+  const direct2025Monthly = getMonthlyByLvl1(data2025, 4);
+
+
 
   const revenueVsDirectLineChartData = {
     labels: ['2024', '2025'],
@@ -128,6 +142,46 @@ const Dashboard = () => {
       }
     ]
   };
+
+  const revenueVsDirectMonthlyLineChartData = {
+    labels: months,
+    datasets: [
+      {
+        label: 'Revenue 2025',
+        data: revenue2025Monthly,
+        borderColor: '#1976d2',
+        backgroundColor: '#1976d2',
+        tension: 0.3,
+          yAxisID: 'y'
+      },
+      {
+        label: 'Revenue 2024',
+        data: revenue2024Monthly,
+        borderColor: '#90caf9',
+        backgroundColor: '#90caf9',
+        tension: 0.3,
+          yAxisID: 'y'
+      },
+      {
+        label: 'Direct Expenses 2025',
+        data: direct2025Monthly,
+        borderColor: '#ffa726',
+        backgroundColor: '#ffa726',
+        tension: 0.3,
+          yAxisID: 'y1'
+      },
+      {
+        label: 'Direct Expenses 2024',
+        data: direct2024Monthly,
+        borderColor: '#ffcc80',
+        backgroundColor: '#ffcc80',
+        tension: 0.3,
+          yAxisID: 'y1'
+      }
+      
+    ]
+  };
+
 
 
 
@@ -203,31 +257,31 @@ const Dashboard = () => {
   };
 
   const allExpensesBreakdown = [...data2024, ...data2025]
-  .filter(item => item.lvl1 === 5);
+    .filter(item => item.lvl1 === 5);
 
-const ExpensesBreakdownLabels = [...new Set(allExpensesBreakdown.map(i => i.sub_title))]
-  .filter(name => {
-    const val2024 = getYTD(data2024.find(i => i.sub_title === name)?.values || {});
-    const val2025 = getYTD(data2025.find(i => i.sub_title === name)?.values || {});
-    return showZero || val2024 !== 0 || val2025 !== 0;
-  });
+  const ExpensesBreakdownLabels = [...new Set(allExpensesBreakdown.map(i => i.sub_title))]
+    .filter(name => {
+      const val2024 = getYTD(data2024.find(i => i.sub_title === name)?.values || {});
+      const val2025 = getYTD(data2025.find(i => i.sub_title === name)?.values || {});
+      return showZero || val2024 !== 0 || val2025 !== 0;
+    });
 
-const ExpensesBreakdownChartData = {
-  labels: ExpensesBreakdownLabels,
-  datasets: [
-    {
-      label: '2025',
-      data: ExpensesBreakdownLabels.map(name => getYTD(data2025.find(i => i.sub_title === name)?.values || {})),
-      backgroundColor: '#1976d2'
-    },
-    {
-      label: '2024',
-      data: ExpensesBreakdownLabels.map(name => getYTD(data2024.find(i => i.sub_title === name)?.values || {})),
-      backgroundColor: '#90caf9'
-    }
+  const ExpensesBreakdownChartData = {
+    labels: ExpensesBreakdownLabels,
+    datasets: [
+      {
+        label: '2025',
+        data: ExpensesBreakdownLabels.map(name => getYTD(data2025.find(i => i.sub_title === name)?.values || {})),
+        backgroundColor: '#1976d2'
+      },
+      {
+        label: '2024',
+        data: ExpensesBreakdownLabels.map(name => getYTD(data2024.find(i => i.sub_title === name)?.values || {})),
+        backgroundColor: '#90caf9'
+      }
 
-  ]
-};
+    ]
+  };
 
 
   if (loading) return <CircularProgress sx={{ mt: 10 }} />;
@@ -289,10 +343,10 @@ const ExpensesBreakdownChartData = {
           <Card>
             <CardContent>
               <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                Revenue vs. Direct Expenses Trend
+                Revenue vs. Direct Expenses Trend by Month
               </Typography>
               <Line
-                data={revenueVsDirectLineChartData}
+                data={revenueVsDirectMonthlyLineChartData}
                 options={{
                   responsive: true,
                   plugins: {
@@ -301,24 +355,39 @@ const ExpensesBreakdownChartData = {
                   },
                   scales: {
                     y: {
+                      type: 'linear',
+                      display: true,
+                      position: 'left',
                       beginAtZero: true,
+                      title: { display: true, text: 'Revenue' },
                       ticks: {
-                        callback: function (value) {
-                          return value.toLocaleString();
-                        }
+                        callback: (value) => value.toLocaleString()
+                      }
+                    },
+                    y1: {
+                      type: 'linear',
+                      display: true,
+                      position: 'right',
+                      grid: { drawOnChartArea: false },
+                      beginAtZero: true,
+                      title: { display: true, text: 'Direct Expenses' },
+                      ticks: {
+                        callback: (value) => value.toLocaleString()
                       }
                     }
                   }
                 }}
+                
               />
             </CardContent>
           </Card>
         </Grid>
+
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Typography variant="subtitle1">Expenses Breakdown</Typography>
+                <Typography variant="subtitle1">Administrative & Other Operating Expnese</Typography>
                 <FormControlLabel
                   control={<Switch checked={showZero} onChange={(e) => setShowZero(e.target.checked)} />}
                   label="Show Zero"

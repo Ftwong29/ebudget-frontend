@@ -62,7 +62,7 @@ const ReportPNL = () => {
   const [hideZeros, setHideZeros] = useState(true);
   const [switching, setSwitching] = useState(false);
   const [expanded, setExpanded] = useState({});
-  const [allExpanded, setAllExpanded] = useState(true);
+  const [allExpanded, setAllExpanded] = useState(false);
   const [expanding, setExpanding] = useState(false);
   const [currencyInfo, setCurrencyInfo] = useState(null);
   const [currencyMode, setCurrencyMode] = useState('base');
@@ -151,13 +151,13 @@ const ReportPNL = () => {
   }, [expanded, treeData]);
 
   const toggleExpand = (key) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
-  useEffect(() => {
-    if (!loading && !switching && Object.keys(expanded).length === 0) {
-      const defaultExpanded = {};
-      treeData.forEach(lvl1 => { defaultExpanded[lvl1.lvl1] = true; });
-      setExpanded(defaultExpanded);
-    }
-  }, [loading, switching, treeData]);
+  // useEffect(() => {
+  //   if (!loading && !switching && Object.keys(expanded).length === 0) {
+  //     const defaultExpanded = {};
+  //     treeData.forEach(lvl1 => { defaultExpanded[lvl1.lvl1] = true; });
+  //     setExpanded(defaultExpanded);
+  //   }
+  // }, [loading, switching, treeData]);
 
   const SkeletonRows = () => (
     <>
@@ -192,11 +192,11 @@ const ReportPNL = () => {
           {[sub1].filter(Boolean).join(' ')}
         </TableCell>
         <TableCell align="right" sx={{ backgroundColor: colorLvl1, fontWeight: 800 }}>
-          {convertCurrency(YTD).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {convertCurrency(YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
         </TableCell>
         {months.map(month => (
           <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl1, fontWeight: 600 }}>
-            {convertCurrency(m1[month]).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {convertCurrency(m1[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
           </TableCell>
         ))}
       </motion.tr>
@@ -214,11 +214,11 @@ const ReportPNL = () => {
               {[lvl2.sub2].filter(Boolean).join(' ')}
             </TableCell>
             <TableCell align="right" sx={{ backgroundColor: colorLvl2, fontWeight: 800 }}>
-              {convertCurrency(lvl2.YTD).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {convertCurrency(lvl2.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
             </TableCell>
             {months.map(month => (
               <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl2, fontWeight: 500 }}>
-                {convertCurrency(lvl2.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {convertCurrency(lvl2.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
               </TableCell>
             ))}
           </motion.tr>
@@ -235,11 +235,11 @@ const ReportPNL = () => {
                   {[lvl3.sub_title].filter(Boolean).join(' ')}
                 </TableCell>
                 <TableCell align="right" sx={{ backgroundColor: colorLvl3, fontWeight: 800, color: 'gray' }}>
-                  {convertCurrency(lvl3.YTD).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {convertCurrency(lvl3.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
                 </TableCell>
                 {months.map(month => (
                   <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl3, fontWeight: 500, color: 'gray' }}>
-                    {convertCurrency(lvl3.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {convertCurrency(lvl3.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
                   </TableCell>
                 ))}
               </motion.tr>
@@ -252,11 +252,11 @@ const ReportPNL = () => {
                     <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: '#ffffff' }}>{item.gl_code}</TableCell>
                     <TableCell sx={{ position: 'sticky', left: 100, backgroundColor: '#ffffff' }}>{item.gl_account_long_name}</TableCell>
                     <TableCell align="right" sx={{ backgroundColor: '#ffffff', fontWeight: 700 }}>
-                      {convertCurrency(calculateYTD(item.values)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {convertCurrency(calculateYTD(item.values)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
                     </TableCell>
                     {months.map(month => (
                       <TableCell key={month} align="right">
-                        {convertCurrency((parseFloat(item.values[month])) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {convertCurrency((parseFloat(item.values[month])) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
                       </TableCell>
                     ))}
                   </motion.tr>
@@ -303,7 +303,7 @@ const ReportPNL = () => {
               sx={{ mr: 2 }}
             />
             <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-              1 {currencyInfo.user_currency} = {currencyInfo.rate.toFixed(2)} {currencyInfo.base_currency}
+              1 {currencyInfo.base_currency} = {currencyInfo.rate.toFixed(2)} {currencyInfo.user_currency}
             </Typography>
           </>
         )}
