@@ -3,7 +3,8 @@ import axiosInstance from '../api/axiosInstance';
 import {
   Box, Typography, Paper, CircularProgress, Table,
   TableBody, TableCell, TableHead, TableRow, TableContainer,
-  FormControlLabel, Switch, Fade, Skeleton, IconButton, Button, Tooltip
+  FormControlLabel, Switch, Fade, Skeleton, IconButton, Button, Tooltip, Stack,
+  FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { ExpandMore, ChevronRight, UnfoldLess, UnfoldMore } from '@mui/icons-material';
@@ -66,6 +67,7 @@ const ReportPNL = () => {
   const [expanding, setExpanding] = useState(false);
   const [currencyInfo, setCurrencyInfo] = useState(null);
   const [currencyMode, setCurrencyMode] = useState('base');
+  const [valueScale, setValueScale] = useState('normal'); // 可为 'normal' | 'thousand' | 'million'
 
   const timeoutRef = useRef();
 
@@ -102,7 +104,7 @@ const ReportPNL = () => {
 
   const convertCurrency = (value) => {
     if (!currencyInfo || currencyMode === 'base') return value;
-    return value / (currencyInfo.rate || 1);
+    return value * (currencyInfo.rate || 1);
   };
 
   const calculateYTD = (values) =>
@@ -142,6 +144,17 @@ const ReportPNL = () => {
       setExpanding(false);
     }, 480);
   };
+
+  const convertAndScaleValue = (value) => {
+    const converted = convertCurrency(value); // 先做 currency conversion
+    switch (valueScale) {
+      case 'million': return converted / 1_000_000;
+      case 'thousand': return converted / 1_000;
+      default: return converted;
+    }
+  };
+
+
 
   useEffect(() => {
     const keys = getAllExpandableKeys(treeData);
@@ -192,11 +205,11 @@ const ReportPNL = () => {
           {[sub1].filter(Boolean).join(' ')}
         </TableCell>
         <TableCell align="right" sx={{ backgroundColor: colorLvl1, fontWeight: 800 }}>
-          {convertCurrency(YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
+          {convertAndScaleValue(YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </TableCell>
         {months.map(month => (
           <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl1, fontWeight: 600 }}>
-            {convertCurrency(m1[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
+            {convertAndScaleValue(m1[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </TableCell>
         ))}
       </motion.tr>
@@ -214,11 +227,11 @@ const ReportPNL = () => {
               {[lvl2.sub2].filter(Boolean).join(' ')}
             </TableCell>
             <TableCell align="right" sx={{ backgroundColor: colorLvl2, fontWeight: 800 }}>
-              {convertCurrency(lvl2.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
+              {convertAndScaleValue(lvl2.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </TableCell>
             {months.map(month => (
               <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl2, fontWeight: 500 }}>
-                {convertCurrency(lvl2.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
+                {convertAndScaleValue(lvl2.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </TableCell>
             ))}
           </motion.tr>
@@ -235,11 +248,11 @@ const ReportPNL = () => {
                   {[lvl3.sub_title].filter(Boolean).join(' ')}
                 </TableCell>
                 <TableCell align="right" sx={{ backgroundColor: colorLvl3, fontWeight: 800, color: 'gray' }}>
-                  {convertCurrency(lvl3.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
+                  {convertAndScaleValue(lvl3.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </TableCell>
                 {months.map(month => (
                   <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl3, fontWeight: 500, color: 'gray' }}>
-                    {convertCurrency(lvl3.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
+                    {convertAndScaleValue(lvl3.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                 ))}
               </motion.tr>
@@ -252,11 +265,11 @@ const ReportPNL = () => {
                     <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: '#ffffff' }}>{item.gl_code}</TableCell>
                     <TableCell sx={{ position: 'sticky', left: 100, backgroundColor: '#ffffff' }}>{item.gl_account_long_name}</TableCell>
                     <TableCell align="right" sx={{ backgroundColor: '#ffffff', fontWeight: 700 }}>
-                      {convertCurrency(calculateYTD(item.values)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
+                      {convertAndScaleValue(calculateYTD(item.values)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     {months.map(month => (
                       <TableCell key={month} align="right">
-                        {convertCurrency((parseFloat(item.values[month])) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2  })}
+                        {convertAndScaleValue((parseFloat(item.values[month])) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     ))}
                   </motion.tr>
@@ -274,58 +287,80 @@ const ReportPNL = () => {
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" sx={{ mb: 2 }}>P&L Report (2025)</Typography>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={hideZeros}
-              onChange={e => {
-                setSwitching(true);
-                setHideZeros(e.target.checked);
-              }}
-              color="primary"
-            />
-          }
-          label="Hide rows with all-zero months"
-          sx={{ mr: 2 }}
-        />
-        {currencyInfo && showCurrencySwitch && (
-          <>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={currencyMode === 'user'}
-                  onChange={e => setCurrencyMode(e.target.checked ? 'user' : 'base')}
-                  color="primary"
-                />
-              }
-              label={`Show in ${currencyMode === 'base' ? currencyInfo.base_currency : currencyInfo.user_currency}`}
-              sx={{ mr: 2 }}
-            />
-            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-              1 {currencyInfo.base_currency} = {currencyInfo.rate.toFixed(2)} {currencyInfo.user_currency}
-            </Typography>
-          </>
-        )}
-        <Tooltip title={allExpanded ? 'Collapse all' : 'Expand all'}>
-          <Button
-            variant="outlined"
-            size="small"
-            color={allExpanded ? 'secondary' : 'primary'}
-            sx={{ ml: 2, minWidth: 128, fontWeight: 600, borderRadius: 2 }}
-            startIcon={allExpanded ? <UnfoldLess /> : <UnfoldMore />}
-            onClick={() => handleExpandCollapseAll(!allExpanded)}
-            disableElevation
-          >
-            {allExpanded ? 'Collapse All' : 'Expand All'}
-          </Button>
-        </Tooltip>
-        <Fade in={switching} unmountOnExit>
-          <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
-            <CircularProgress size={20} sx={{ mr: 1 }} />
-            <Typography variant="body2" color="primary.main" fontWeight={500}>Updating view...</Typography>
-          </Box>
-        </Fade>
+      <Box sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={3} flexWrap="wrap" alignItems="center">
+          {/* ✅ Zero Filter */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={hideZeros}
+                onChange={e => {
+                  setSwitching(true);
+                  setHideZeros(e.target.checked);
+                }}
+                color="primary"
+              />
+            }
+            label="Hide rows with all-zero months"
+          />
+
+          {/* ✅ Currency Switch */}
+          {currencyInfo && showCurrencySwitch && (
+            <>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={currencyMode === 'user'}
+                    onChange={e => setCurrencyMode(e.target.checked ? 'user' : 'base')}
+                    color="primary"
+                  />
+                }
+                label={`Show in ${currencyMode === 'base' ? currencyInfo.base_currency : currencyInfo.user_currency}`}
+              />
+              <Typography variant="body2" color="text.secondary">
+                1 {currencyInfo.base_currency} = {currencyInfo.rate.toFixed(2)} {currencyInfo.user_currency}
+              </Typography>
+            </>
+          )}
+
+          {/* ✅ Expand / Collapse */}
+          <Tooltip title={allExpanded ? 'Collapse all' : 'Expand all'}>
+            <Button
+              variant="outlined"
+              size="small"
+              color={allExpanded ? 'secondary' : 'primary'}
+              sx={{ minWidth: 128, fontWeight: 600, borderRadius: 2 }}
+              startIcon={allExpanded ? <UnfoldLess /> : <UnfoldMore />}
+              onClick={() => handleExpandCollapseAll(!allExpanded)}
+              disableElevation
+            >
+              {allExpanded ? 'Collapse All' : 'Expand All'}
+            </Button>
+          </Tooltip>
+
+          {/* ✅ Display Unit Selector */}
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel id="value-scale-label">Display Unit</InputLabel>
+            <Select
+              labelId="value-scale-label"
+              value={valueScale}
+              label="Display Unit"
+              onChange={(e) => setValueScale(e.target.value)}
+            >
+              <MenuItem value="normal">None</MenuItem>
+              <MenuItem value="thousand">Thousands</MenuItem>
+              <MenuItem value="million">Millions</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* ✅ Loading Fade-in */}
+          <Fade in={switching} unmountOnExit>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <CircularProgress size={20} sx={{ mr: 1 }} />
+              <Typography variant="body2" color="primary.main" fontWeight={500}>Updating view...</Typography>
+            </Box>
+          </Fade>
+        </Stack>
       </Box>
       <TableContainer component={Paper} sx={{ maxHeight: 700, transition: 'box-shadow 0.3s' }}>
         <Table size="small" stickyHeader>
