@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import CryptoJS from 'crypto-js';
 
 const secretKey = process.env.REACT_APP_SECRET_KEY;
-const budgetCategories = ['Sales','Trustee', 'Cost', 'NonOperating', 'Direct', 'Indirect', 'Manpower','Int, Tax, Depr.', 'Related'];
+const budgetCategories = ['Sales', 'Trustee', 'Cost', 'NonOperating', 'Direct', 'Indirect', 'Manpower', 'Int, Tax, Depr.', 'Related'];
 
 const BudgetInputPage = () => {
   const { user } = useSelector((state) => state.auth);
@@ -34,6 +34,9 @@ const BudgetInputPage = () => {
   const [availableProfitCenters, setAvailableProfitCenters] = useState([]);
   const [selectedProfitCenter, setSelectedProfitCenter] = useState('');
   const [currentGlCode, setCurrentGlCode] = useState('');
+  const [relatedGLInfo, setRelatedGLInfo] = useState([]);
+  const [selectedGlCode, setSelectedGlCode] = useState('');
+
 
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -95,15 +98,16 @@ const BudgetInputPage = () => {
   const fetchGLData = async (category) => {
     setLoading(true);
     try {
-  
+
       const res = await axiosInstance.get(`/gl/glinput-category`, {
         params: { category: category.toLowerCase() }
       });
 
       if (category.toLowerCase() === 'related') {
-        const { glItems, groupedData } = res.data;
+        const { glItems, groupedData, relatedGLInfo } = res.data;
         setGlItems(glItems);
         setGroupedCompanies(groupedData);
+        setRelatedGLInfo(relatedGLInfo || []); // ✅ 新加
         setSelectedCompany('');
         setAvailableProfitCenters([]);
         setSelectedProfitCenter('');
@@ -173,6 +177,7 @@ const BudgetInputPage = () => {
     setAvailableProfitCenters([])
     setSelectedProfitCenter("")
     setSelectedCompany('');
+    setSelectedGlCode('');
   };
 
   const handleCategoryChange = (event, newCategory) => {
@@ -207,12 +212,17 @@ const BudgetInputPage = () => {
     setSelectedProfitCenter(value);
     setLoading(true);
     try {
-      const res = await axiosInstance.post('/gl/glinput-load-related', {
+      const encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify({
         glyear: 2025,
         company: selectedCompany,
         profitCenter: value,
         glcode: glCode?.toString()
+      }), secretKey).toString();
+
+      const res = await axiosInstance.post('/gl/glinput-load-related', {
+        data: encryptedPayload
       });
+
       // ✅ 将返回的 related current 值保存
       if (res.data?.current) {
         setRelatedValues(res.data.current);
@@ -227,6 +237,7 @@ const BudgetInputPage = () => {
       setLoading(false);
     }
   };
+
 
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
@@ -303,107 +314,168 @@ const BudgetInputPage = () => {
       <Dialog open={open} onClose={handleCloseDialog} fullWidth maxWidth="md">
         <DialogTitle>Monthly Details: {selectedItem?.gl_account_long_name}</DialogTitle>
 
-<DialogContent sx={{ py: 0 }}>
-  {/* ✅ 加入 padding 容器确保底部按钮与总和有足够空隙，避免遮挡 */}
-  <Box sx={{ maxHeight: '65vh', overflowY: 'auto', px: 3, pt: 3 }}>
-    <Grid container spacing={2}>
-      {months.map((month) => {
-        const glCode = selectedItem?.gl_code;
-        const relatedVal = relatedValues[glCode]?.[month];
-        const prevVal = previousValues[glCode]?.[month];
+        <DialogContent sx={{ py: 0 }}>
+          {/* ✅ 加入 padding 容器确保底部按钮与总和有足够空隙，避免遮挡 */}
+          <Box sx={{ maxHeight: '65vh', overflowY: 'auto', px: 3, pt: 3 }}>
+            <Grid container spacing={2}>
+              {months.map((month) => {
+                const glCode = selectedItem?.gl_code;
+                const relatedVal = relatedValues[selectedGlCode]?.[month];
+                const prevVal = previousValues[glCode]?.[month];
 
-        const showRelated = relatedVal !== null && relatedVal !== undefined && parseFloat(relatedVal) !== 0;
-        const showPrev = prevVal !== null && prevVal !== undefined && parseFloat(prevVal) !== 0;
+                const showRelated = relatedVal !== null && relatedVal !== undefined && parseFloat(relatedVal) !== 0;
+                const showPrev = prevVal !== null && prevVal !== undefined && parseFloat(prevVal) !== 0;
 
-        return (
-          <Grid item xs={12} sm={6} md={3} key={month} sx={{ scrollMarginTop: '100px' }}>
-            <TextField
-              label={month}
-              type="number"
-              size="small"
-              fullWidth
-              value={inputValues[glCode]?.[month] || ''}
-              onChange={(e) => handleInputChange(glCode, month, e.target.value)}
-            />
+                return (
+                  <Grid item xs={12} sm={6} md={3} key={month} sx={{ scrollMarginTop: '100px' }}>
+                    <TextField
+                      label={month}
+                      type="number"
+                      size="small"
+                      fullWidth
+                      value={inputValues[glCode]?.[month] || ''}
+                      onChange={(e) => handleInputChange(glCode, month, e.target.value)}
+                    />
 
-            {showRelated && (
+                    {showRelated && (
+                      <Box
+                        mt={0.5}
+                        px={1}
+                        py={0.25}
+                        borderRadius={1}
+                        bgcolor="#e3f2fd"
+                        fontSize={12}
+                        color="text.secondary"
+                      >
+                        Related: {formatNumber(parseFloat(relatedVal))}
+                      </Box>
+                    )}
+
+                    {showPrev && (
+                      <Box
+                        mt={0.5}
+                        px={1}
+                        py={0.25}
+                        borderRadius={1}
+                        bgcolor="#f5f5f5"
+                        fontSize={12}
+                        color="text.secondary"
+                      >
+                        Prev: {formatNumber(parseFloat(prevVal))}
+                      </Box>
+                    )}
+                  </Grid>
+                );
+              })}
+            </Grid>
+
+            {/* ✅ 实时总和展示 */}
+            {selectedItem && (
+              <Box mt={4} textAlign="right">
+                <Typography variant="h6">
+                  Total: {formatNumber(calculateItemTotal(selectedItem.gl_code))}
+                </Typography>
+                {/* Related Total */}
+                {relatedValues[selectedGlCode] && (
+                  <Typography variant="body2" color="text.secondary">
+                    Related Total:{" "}
+                    {formatNumber(
+                      months.reduce((sum, m) => {
+                        const val = parseFloat(relatedValues[selectedGlCode]?.[m]) || 0;
+                        return sum + val;
+                      }, 0)
+                    )}
+                  </Typography>
+                )}
+
+                {/* Previous Total */}
+                {previousValues[selectedItem.gl_code] && (
+                  <Typography variant="body2" color="text.secondary">
+                    Prev Total:{" "}
+                    {formatNumber(
+                      months.reduce((sum, m) => {
+                        const val = parseFloat(previousValues[selectedItem.gl_code]?.[m]) || 0;
+                        return sum + val;
+                      }, 0)
+                    )}
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
+
+          {/* 相关公司选择器（保持原状） */}
+          {(
+            selectedCategory === 'Related' ||
+            (
+              selectedItem?.lvl1 === 2 &&
+              (
+                selectedItem?.sub2 === 'PRE-NEED COST OF SALES' ||
+                selectedItem?.sub2 === 'AS-NEED COST OF SALES'
+              )
+            )
+          ) && (
               <Box
-                mt={0.5}
-                px={1}
-                py={0.25}
-                borderRadius={1}
-                bgcolor="#e3f2fd"
-                fontSize={12}
-                color="text.secondary"
+                mt={4}
+                px={3}
+                pb={2}
+                display="flex"
+                flexDirection={{ xs: 'column', sm: 'row' }}
+                gap={2}
+                flexWrap="wrap"
               >
-                Related: {formatNumber(parseFloat(relatedVal))}
+                {/* 公司选择器 */}
+                <Autocomplete
+                  fullWidth
+                  options={[...new Set(groupedCompanies.map(gc => gc.company_name))]}
+                  value={selectedCompany}
+                  onChange={(e, value) => setSelectedCompany(value || '')}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Company" variant="outlined" size="small" />
+                  )}
+                />
+
+                {/* Profit Center */}
+                <TextField
+                  select
+                  label="Profit Center"
+                  size="small"
+                  fullWidth
+                  value={selectedProfitCenter}
+                  onChange={e => handleProfitCenterChange(e.target.value, selectedGlCode)}
+                  disabled={!selectedCompany}
+                  SelectProps={{ native: true }}
+                >
+                  {availableProfitCenters.map(pc => (
+                    <option key={pc} value={pc}>{pc}</option>
+                  ))}
+                </TextField>
+
+                {/* ✅ Related GL Info */}
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  value={selectedGlCode}
+                  onChange={(e) => {
+                    const glCode = e.target.value;
+                    setSelectedGlCode(glCode);              // ✅ 触发重新渲染 input 区
+                    handleProfitCenterChange(selectedProfitCenter, glCode);
+                  }}
+
+                  SelectProps={{ native: true }}
+                >
+                  <option value="">Select GL Code</option>
+                  {relatedGLInfo.map(info => (
+                    <option key={info.gl_code} value={info.gl_code}>
+                      {info.gl_code} - {info.gl_account_short_name}
+                    </option>
+                  ))}
+                </TextField>
               </Box>
             )}
 
-            {showPrev && (
-              <Box
-                mt={0.5}
-                px={1}
-                py={0.25}
-                borderRadius={1}
-                bgcolor="#f5f5f5"
-                fontSize={12}
-                color="text.secondary"
-              >
-                Prev: {formatNumber(parseFloat(prevVal))}
-              </Box>
-            )}
-          </Grid>
-        );
-      })}
-    </Grid>
-
-    {/* ✅ 实时总和展示 */}
-    {selectedItem && (
-      <Box mt={4} textAlign="right">
-        <Typography variant="h6">
-          Total: {formatNumber(calculateItemTotal(selectedItem.gl_code))}
-        </Typography>
-      </Box>
-    )}
-  </Box>
-
-  {/* 相关公司选择器（保持原状） */}
-  {selectedCategory === 'Related' && (
-    <Box
-      mt={4}
-      px={3}
-      pb={2}
-      display="flex"
-      flexDirection={{ xs: 'column', sm: 'row' }}
-      gap={2}
-    >
-      <Autocomplete
-        fullWidth
-        options={[...new Set(groupedCompanies.map(gc => gc.company_name))]}
-        value={selectedCompany}
-        onChange={(e, value) => setSelectedCompany(value || '')}
-        renderInput={(params) => (
-          <TextField {...params} label="Company" variant="outlined" size="small" />
-        )}
-      />
-      <TextField
-        select
-        label="Profit Center"
-        size="small"
-        fullWidth
-        value={selectedProfitCenter}
-        onChange={e => handleProfitCenterChange(e.target.value, selectedItem?.gl_code)}
-        disabled={!selectedCompany}
-        SelectProps={{ native: true }}
-      >
-        {availableProfitCenters.map(pc => (
-          <option key={pc} value={pc}>{pc}</option>
-        ))}
-      </TextField>
-    </Box>
-  )}
-</DialogContent>
+        </DialogContent>
 
 
 
