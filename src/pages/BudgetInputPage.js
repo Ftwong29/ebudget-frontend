@@ -103,17 +103,28 @@ const BudgetInputPage = () => {
         params: { category: category.toLowerCase() }
       });
 
-      if (category.toLowerCase() === 'related') {
-        const { glItems, groupedData, relatedGLInfo } = res.data;
-        setGlItems(glItems);
-        setGroupedCompanies(groupedData);
-        setRelatedGLInfo(relatedGLInfo || []); // ✅ 新加
-        setSelectedCompany('');
-        setAvailableProfitCenters([]);
-        setSelectedProfitCenter('');
-      } else {
-        setGlItems(res.data.glItems || res.data);
-      }
+      // if (category.toLowerCase() === 'related') {
+
+      //   const { glItems, groupedData, relatedGLInfo } = res.data;
+      //   setGlItems(glItems);
+      //   setGroupedCompanies(groupedData);
+      //   setRelatedGLInfo(relatedGLInfo || []); // ✅ 新加
+      //   setSelectedCompany('');
+      //   setAvailableProfitCenters([]);
+      //   setSelectedProfitCenter('');
+      // } else {
+      //   setGlItems(res.data.glItems || res.data);
+      // }
+
+
+      const { glItems, groupedData, relatedGLInfo } = res.data;
+      setGlItems(glItems);
+      setGroupedCompanies(groupedData);
+      setRelatedGLInfo(relatedGLInfo || []); // ✅ 新加
+      setSelectedCompany('');
+      setAvailableProfitCenters([]);
+      setSelectedProfitCenter('');
+
       await loadSavedValues(category);
     } catch (err) {
       console.error('❌ Failed to load GL items:', err);
@@ -128,6 +139,9 @@ const BudgetInputPage = () => {
   }, [selectedCategory, user]);
 
   useEffect(() => {
+
+    if (!Array.isArray(groupedCompanies)) return;
+
     const filtered = groupedCompanies.filter(g => g.company_name === selectedCompany);
     let profitCenters = filtered.map(g => g.profit_center);
 
@@ -427,13 +441,14 @@ const BudgetInputPage = () => {
                 {/* 公司选择器 */}
                 <Autocomplete
                   fullWidth
-                  options={[...new Set(groupedCompanies.map(gc => gc.company_name))]}
+                  options={[...new Set((groupedCompanies || []).map(gc => gc.company_name))]}
                   value={selectedCompany}
                   onChange={(e, value) => setSelectedCompany(value || '')}
                   renderInput={(params) => (
                     <TextField {...params} label="Company" variant="outlined" size="small" />
                   )}
                 />
+
 
                 {/* Profit Center */}
                 <TextField

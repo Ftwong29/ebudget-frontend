@@ -4,11 +4,12 @@ import {
   Box, Typography, Paper, CircularProgress, Table,
   TableBody, TableCell, TableHead, TableRow, TableContainer,
   FormControlLabel, Switch, Fade, Skeleton, IconButton, Button, Tooltip, Stack,
-  FormControl, InputLabel, Select, MenuItem
+  FormControl, InputLabel, Select, MenuItem, Checkbox, Menu, ListItemText,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { ExpandMore, ChevronRight, UnfoldLess, UnfoldMore } from '@mui/icons-material';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -68,31 +69,86 @@ const ReportPNL = () => {
   const [currencyInfo, setCurrencyInfo] = useState(null);
   const [currencyMode, setCurrencyMode] = useState('base');
   const [valueScale, setValueScale] = useState('normal'); // 可为 'normal' | 'thousand' | 'million'
+  const [availableProfitCenters, setAvailableProfitCenters] = useState([]);
+  const [availableCostCenters, setAvailableCostCenters] = useState([]);
+
+  const [selectedProfitCenters, setSelectedProfitCenters] = useState([]);
+  const [selectedCostCenters, setSelectedCostCenters] = useState([]);
+
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailRecords, setDetailRecords] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailParams, setDetailParams] = useState(null);
+
+
+
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
 
   const timeoutRef = useRef();
 
   useEffect(() => {
-    const fetchPNL = async () => {
+    const initStructure = async () => {
+      if (user?.cost_center !== 'FIN&CORP') return;
+
+      try {
+        const structureRes = await axiosInstance.get('/report/company-structure');
+        const pcs = structureRes.data.profit_centers || [];
+        const ccs = structureRes.data.cost_centers || [];
+
+        setAvailableProfitCenters(pcs);
+        setAvailableCostCenters(ccs);
+
+        setSelectedProfitCenters(pcs); // 默认全选
+        setSelectedCostCenters(ccs);   // 默认全选
+      } catch (err) {
+        console.error('❌ Failed to load structure:', err);
+      }
+    };
+
+    initStructure();
+  }, [user]);
+  useEffect(() => {
+    const loadPNL = async () => {
+      if (!user) return;
+
+      const isFINCORP = user.cost_center === 'FIN&CORP';
+
+      let profit_centers = [];
+      let cost_centers = [];
+
+      if (isFINCORP) {
+        profit_centers = selectedProfitCenters;
+        cost_centers = selectedCostCenters;
+
+        if (profit_centers.length === 0 && cost_centers.length === 0) return;
+      } else {
+        cost_centers = [user.cost_center_name];
+      }
+
       setLoading(true);
       try {
         const res = await axiosInstance.get('/report/pnl', {
           params: {
             glyear: 2025,
-            company: user?.company_name,
+            profit_centers,
+            cost_centers,
             _: Date.now()
           }
         });
         setRecords(res.data.data || []);
         setCurrencyInfo(res.data.currency_info || null);
       } catch (err) {
-        console.error('Failed to load PNL report:', err);
+        console.error('❌ Failed to load PNL:', err);
       } finally {
         setLoading(false);
       }
     };
-    if (user?.company_name) fetchPNL();
-    return () => clearTimeout(timeoutRef.current);
-  }, [user]);
+
+    loadPNL();
+  }, [user, selectedProfitCenters, selectedCostCenters]);
+
 
   useEffect(() => {
     if (switching) {
@@ -103,8 +159,86 @@ const ReportPNL = () => {
 
 
   const convertCurrency = (value) => {
-    if (!currencyInfo || currencyMode === 'base') return value;
-    return value * (currencyInfo.rate || 1);
+    if (!currencyInfo || currencyMode === 'user') return value;
+    return value / (currencyInfo.rate || 1);
+  };
+
+  const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
+    const [anchorEl, setAnchorEl] = useState(null);
+    const open = Boolean(anchorEl);
+
+    const allSelected = selected.length === options.length;
+
+    const handleToggle = (value) => {
+      const current = selected.includes(value);
+      const newSelected = current
+        ? selected.filter((v) => v !== value)
+        : [...selected, value];
+      onChange(newSelected);
+    };
+
+    const handleSelectAllToggle = () => {
+      if (allSelected) {
+        onChange([]);
+      } else {
+        onChange(options);
+      }
+    };
+
+    return (
+      <>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={(e) => setAnchorEl(e.currentTarget)}
+          sx={{ minWidth: 180, textTransform: 'none' }}
+        >
+          {allSelected ? `All ${label}` : `${selected.length} ${label}`}
+        </Button>
+        <Menu
+          anchorEl={anchorEl}
+          open={open}
+          onClose={() => setAnchorEl(null)}
+          PaperProps={{ style: { maxHeight: 300, width: 240 } }}
+        >
+          <MenuItem onClick={handleSelectAllToggle}>
+            <Checkbox checked={allSelected} />
+            <ListItemText primary="Select All" />
+          </MenuItem>
+          {options.map((option) => (
+            <MenuItem key={option} onClick={() => handleToggle(option)}>
+              <Checkbox checked={selected.includes(option)} />
+              <ListItemText primary={option} />
+            </MenuItem>
+          ))}
+        </Menu>
+      </>
+    );
+  };
+
+  const ProfitAndCostFilter = ({
+    profitCenters = [],
+    costCenters = [],
+    selectedProfitCenters = [],
+    selectedCostCenters = [],
+    onChange = () => { }
+  }) => {
+    return (
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+        <MultiSelectDropdown
+          label="Profit Centers"
+          options={profitCenters}
+          selected={selectedProfitCenters}
+          onChange={(newProfits) => onChange(newProfits, selectedCostCenters)}
+        />
+        <MultiSelectDropdown
+          label="Cost Centers"
+          options={costCenters}
+          selected={selectedCostCenters}
+          onChange={(newCosts) => onChange(selectedProfitCenters, newCosts)}
+        />
+      </Stack>
+    );
   };
 
   const calculateYTD = (values) =>
@@ -204,11 +338,21 @@ const ReportPNL = () => {
           )}
           {[sub1].filter(Boolean).join(' ')}
         </TableCell>
-        <TableCell align="right" sx={{ backgroundColor: colorLvl1, fontWeight: 800 }}>
+        <TableCell align="right" onClick={() =>
+          handleCellClick({
+            type: 'lvl1',
+            lvl1,
+            month: "YTD"
+          })} sx={{ backgroundColor: colorLvl1, fontWeight: 800, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
           {convertAndScaleValue(YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </TableCell>
         {months.map(month => (
-          <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl1, fontWeight: 600 }}>
+          <TableCell key={month} align="right" onClick={() =>
+            handleCellClick({
+              type: 'lvl1',
+              lvl1,
+              month
+            })} sx={{ backgroundColor: colorLvl1, fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
             {convertAndScaleValue(m1[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </TableCell>
         ))}
@@ -226,15 +370,29 @@ const ReportPNL = () => {
               </IconButton>
               {[lvl2.sub2].filter(Boolean).join(' ')}
             </TableCell>
-            <TableCell align="right" sx={{ backgroundColor: colorLvl2, fontWeight: 800 }}>
+            <TableCell align="right"
+              onClick={() =>
+                handleCellClick({
+                  type: 'lvl2',
+                  lvl1, lvl2: lvl2.lvl2,
+                  month: "YTD"
+                })} sx={{ backgroundColor: colorLvl2, fontWeight: 800, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
               {convertAndScaleValue(lvl2.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </TableCell>
             {months.map(month => (
-              <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl2, fontWeight: 500 }}>
+              <TableCell key={month} align="right"
+                onClick={() =>
+                  handleCellClick({
+                    type: 'lvl2',
+                    lvl1, lvl2: lvl2.lvl2,
+                    month
+                  })}
+                sx={{ backgroundColor: colorLvl2, fontWeight: 500, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }} >
                 {convertAndScaleValue(lvl2.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </TableCell>
-            ))}
-          </motion.tr>
+            ))
+            }
+          </motion.tr >
         );
         if (expanded[k2]) {
           lvl2.lvl3s.forEach(lvl3 => {
@@ -247,11 +405,25 @@ const ReportPNL = () => {
                   </IconButton>
                   {[lvl3.sub_title].filter(Boolean).join(' ')}
                 </TableCell>
-                <TableCell align="right" sx={{ backgroundColor: colorLvl3, fontWeight: 800, color: 'gray' }}>
+                <TableCell align="right"
+                  onClick={() =>
+                    handleCellClick({
+                      type: 'lvl3',
+                      lvl1, lvl2, lvl3: lvl3.lvl3,
+                      month: "YTD"
+                    })}
+                  sx={{ backgroundColor: colorLvl3, fontWeight: 800, color: 'gray', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                   {convertAndScaleValue(lvl3.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </TableCell>
                 {months.map(month => (
-                  <TableCell key={month} align="right" sx={{ backgroundColor: colorLvl3, fontWeight: 500, color: 'gray' }}>
+                  <TableCell key={month} align="right"
+                    onClick={() =>
+                      handleCellClick({
+                        type: 'lvl3',
+                        lvl1, lvl2, lvl3: lvl3.lvl3,
+                        month
+                      })}
+                    sx={{ backgroundColor: colorLvl3, fontWeight: 500, color: 'gray', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                     {convertAndScaleValue(lvl3.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                 ))}
@@ -264,11 +436,27 @@ const ReportPNL = () => {
                   <motion.tr key={item.gl_code + '_' + idx} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                     <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: '#ffffff' }}>{item.gl_code}</TableCell>
                     <TableCell sx={{ position: 'sticky', left: 100, backgroundColor: '#ffffff' }}>{item.gl_account_long_name}</TableCell>
-                    <TableCell align="right" sx={{ backgroundColor: '#ffffff', fontWeight: 700 }}>
+                    <TableCell align="right"
+                      onClick={() =>
+                        handleCellClick({
+                          type: 'gl',
+                          gl_code: item.gl_code,
+                          lvl1, lvl2, lvl3,
+                          month: 'YTD'
+                        })}
+                      sx={{ backgroundColor: '#ffffff', fontWeight: 700, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                       {convertAndScaleValue(calculateYTD(item.values)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     {months.map(month => (
-                      <TableCell key={month} align="right">
+                      <TableCell key={month} align="right"
+                        onClick={() =>
+                          handleCellClick({
+                            type: 'gl',
+                            gl_code: item.gl_code,
+                            lvl1, lvl2, lvl3,
+                            month
+                          })}
+                        sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                         {convertAndScaleValue((parseFloat(item.values[month])) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     ))}
@@ -283,126 +471,219 @@ const ReportPNL = () => {
     return rows;
   }
 
+  const handleCellClick = async ({ type, gl_code, lvl1, lvl2, lvl3, month }) => {
+    if (user?.cost_center !== 'FIN&CORP') return;
+
+    setDetailModalOpen(true);
+    setDetailLoading(true);
+    setDetailParams({ type, gl_code, lvl1, lvl2, lvl3, month });
+
+    try {
+      const res = await axiosInstance.get('/report/details', {
+        params: {
+          year: 2025,
+          month,
+          type,
+          gl_code,
+          lvl1,
+          lvl2,
+          lvl3,
+          profit_centers: selectedProfitCenters,
+          cost_centers: selectedCostCenters,
+        }
+      });
+      setDetailRecords(res.data?.records || []);
+    } catch (err) {
+      console.error('❌ Failed to fetch detail records:', err);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4" sx={{ mb: 2 }}>P&L Report (2025)</Typography>
-      <Box sx={{ mb: 2 }}>
-        <Stack direction="row" spacing={3} flexWrap="wrap" alignItems="center">
-          {/* ✅ Zero Filter */}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={hideZeros}
-                onChange={e => {
-                  setSwitching(true);
-                  setHideZeros(e.target.checked);
-                }}
-                color="primary"
-              />
-            }
-            label="Hide rows with all-zero months"
-          />
-
-          {/* ✅ Currency Switch */}
-          {currencyInfo && showCurrencySwitch && (
-            <>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={currencyMode === 'user'}
-                    onChange={e => setCurrencyMode(e.target.checked ? 'user' : 'base')}
-                    color="primary"
-                  />
-                }
-                label={`Show in ${currencyMode === 'base' ? currencyInfo.base_currency : currencyInfo.user_currency}`}
-              />
-              <Typography variant="body2" color="text.secondary">
-                1 {currencyInfo.base_currency} = {currencyInfo.rate.toFixed(2)} {currencyInfo.user_currency}
-              </Typography>
-            </>
-          )}
-
-          {/* ✅ Expand / Collapse */}
-          <Tooltip title={allExpanded ? 'Collapse all' : 'Expand all'}>
-            <Button
-              variant="outlined"
-              size="small"
-              color={allExpanded ? 'secondary' : 'primary'}
-              sx={{ minWidth: 128, fontWeight: 600, borderRadius: 2 }}
-              startIcon={allExpanded ? <UnfoldLess /> : <UnfoldMore />}
-              onClick={() => handleExpandCollapseAll(!allExpanded)}
-              disableElevation
-            >
-              {allExpanded ? 'Collapse All' : 'Expand All'}
-            </Button>
-          </Tooltip>
-
-          {/* ✅ Display Unit Selector */}
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel id="value-scale-label">Display Unit</InputLabel>
-            <Select
-              labelId="value-scale-label"
-              value={valueScale}
-              label="Display Unit"
-              onChange={(e) => setValueScale(e.target.value)}
-            >
-              <MenuItem value="normal">None</MenuItem>
-              <MenuItem value="thousand">Thousands</MenuItem>
-              <MenuItem value="million">Millions</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* ✅ Loading Fade-in */}
-          <Fade in={switching} unmountOnExit>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <CircularProgress size={20} sx={{ mr: 1 }} />
-              <Typography variant="body2" color="primary.main" fontWeight={500}>Updating view...</Typography>
+    <>
+      <Dialog open={detailModalOpen} onClose={() => setDetailModalOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle>
+          Details for {detailParams?.month === 'YTD' ? 'YTD' : detailParams?.month}
+        </DialogTitle>
+        <DialogContent>
+          {detailLoading ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <CircularProgress />
             </Box>
-          </Fade>
-        </Stack>
-      </Box>
-      <TableContainer component={Paper} sx={{ maxHeight: 700, transition: 'box-shadow 0.3s' }}>
-        <Table size="small" stickyHeader>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#fafafa' }}>GL Code</TableCell>
-              <TableCell sx={{ position: 'sticky', left: 100, zIndex: 2, backgroundColor: '#fafafa' }}>Account Name</TableCell>
-              <TableCell align="right">YTD</TableCell>
-              {months.map(month => (
-                <TableCell key={month} align="right">{month}</TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {(loading || switching) ? (
-              <SkeletonRows />
-            ) : (
-              treeData.length === 0 ? (
+          ) : detailRecords.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">No records found.</Typography>
+          ) : (
+            <Table size="small">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={15} align="center">
-                    <Typography variant="body2" color="text.secondary">No records found.</Typography>
-                  </TableCell>
+
+                  <TableCell>Cost Center</TableCell>
+                  <TableCell>GL Code</TableCell>
+                  <TableCell align="right">Amount</TableCell>
+
+
                 </TableRow>
-              ) : (
-                treeData.map(lvl1Node => renderTree(lvl1Node))
-              )
+              </TableHead>
+              <TableBody>
+                {detailRecords.map((rec, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{rec.cost_center}</TableCell>
+                    <TableCell>{rec.gl_code}</TableCell>
+
+                    <TableCell align="right">{parseFloat(rec.amount).toLocaleString()}</TableCell>
+
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailModalOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Box sx={{ p: 4 }}>
+        <Typography variant="h4" sx={{ mb: 2 }}>P&L Report (2025)</Typography>
+        <Box sx={{ mb: 2 }}>
+          <Stack direction="row" spacing={3} flexWrap="wrap" alignItems="center">
+            {/* ✅ Zero Filter */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={hideZeros}
+                  onChange={e => {
+                    setSwitching(true);
+                    setHideZeros(e.target.checked);
+                  }}
+                  color="primary"
+                />
+              }
+              label="Hide rows with all-zero months"
+            />
+
+            {/* ✅ Currency Switch */}
+            {currencyInfo && showCurrencySwitch && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={currencyMode === 'user'}
+                      onChange={e => setCurrencyMode(e.target.checked ? 'user' : 'base')}
+                      color="primary"
+                    />
+                  }
+                  label={`Show in ${currencyMode === 'base' ? currencyInfo.base_currency : currencyInfo.user_currency}`}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  1 {currencyInfo.base_currency} = {currencyInfo.rate.toFixed(2)} {currencyInfo.user_currency}
+                </Typography>
+              </>
             )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      <Fade in={expanding} unmountOnExit>
-        <Box sx={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          bgcolor: 'rgba(255,255,255,0.75)', zIndex: 5,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'all'
-        }}>
-          <CircularProgress size={48} sx={{ color: 'primary.main' }} />
-          <Typography sx={{ ml: 2, fontWeight: 600, color: 'primary.main' }}>Updating View...</Typography>
+
+            {/* ✅ Expand / Collapse */}
+            <Tooltip title={allExpanded ? 'Collapse all' : 'Expand all'}>
+              <Button
+                variant="outlined"
+                size="small"
+                color={allExpanded ? 'secondary' : 'primary'}
+                sx={{ minWidth: 128, fontWeight: 600, borderRadius: 2 }}
+                startIcon={allExpanded ? <UnfoldLess /> : <UnfoldMore />}
+                onClick={() => handleExpandCollapseAll(!allExpanded)}
+                disableElevation
+              >
+                {allExpanded ? 'Collapse All' : 'Expand All'}
+              </Button>
+            </Tooltip>
+
+            {user?.cost_center === 'FIN&CORP' && (
+              <>
+                {user?.cost_center === 'FIN&CORP' && (
+                  <ProfitAndCostFilter
+                    profitCenters={availableProfitCenters}
+                    costCenters={availableCostCenters}
+                    selectedProfitCenters={selectedProfitCenters}
+                    selectedCostCenters={selectedCostCenters}
+                    onChange={(profits, costs) => {
+                      setSelectedProfitCenters(profits);
+                      setSelectedCostCenters(costs);
+                    }}
+                  />
+                )}
+
+              </>
+            )}
+
+
+            {/* ✅ Display Unit Selector */}
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id="value-scale-label">Display Unit</InputLabel>
+              <Select
+                labelId="value-scale-label"
+                value={valueScale}
+                label="Display Unit"
+                onChange={(e) => setValueScale(e.target.value)}
+              >
+                <MenuItem value="normal">None</MenuItem>
+                <MenuItem value="thousand">Thousands</MenuItem>
+                <MenuItem value="million">Millions</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* ✅ Loading Fade-in */}
+            <Fade in={switching} unmountOnExit>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                <Typography variant="body2" color="primary.main" fontWeight={500}>Updating view...</Typography>
+              </Box>
+            </Fade>
+          </Stack>
         </Box>
-      </Fade>
-    </Box>
+        <TableContainer component={Paper} sx={{ maxHeight: 700, transition: 'box-shadow 0.3s' }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#fafafa' }}>GL Code</TableCell>
+                <TableCell sx={{ position: 'sticky', left: 100, zIndex: 2, backgroundColor: '#fafafa' }}>Account Name</TableCell>
+                <TableCell align="right">YTD</TableCell>
+                {months.map(month => (
+                  <TableCell key={month} align="right">{month}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(loading || switching) ? (
+                <SkeletonRows />
+              ) : (
+                treeData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={15} align="center">
+                      <Typography variant="body2" color="text.secondary">No records found.</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  treeData.map(lvl1Node => renderTree(lvl1Node))
+                )
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <Fade in={expanding} unmountOnExit>
+          <Box sx={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            bgcolor: 'rgba(255,255,255,0.75)', zIndex: 5,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            pointerEvents: 'all'
+          }}>
+            <CircularProgress size={48} sx={{ color: 'primary.main' }} />
+            <Typography sx={{ ml: 2, fontWeight: 600, color: 'primary.main' }}>Updating View...</Typography>
+          </Box>
+        </Fade>
+      </Box>
+    </>
   );
 };
 

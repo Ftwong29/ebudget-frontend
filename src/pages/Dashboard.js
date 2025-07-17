@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 import {
-  Box, Typography, Grid, Card, CardContent, CircularProgress, FormControlLabel, Switch
+  Box, Typography, Grid, Card, CardContent, CircularProgress, FormControlLabel, Switch, Stack,
+  Button, Menu, MenuItem, Checkbox, ListItemText
 } from '@mui/material';
 import { Bar, Line } from 'react-chartjs-2';
 import {
@@ -26,27 +27,39 @@ const Dashboard = () => {
   const [data2025, setData2025] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showZero, setShowZero] = useState(false);
+  const [availableProfitCenters, setAvailableProfitCenters] = useState([]);
+  const [selectedProfitCenters, setSelectedProfitCenters] = useState([]);
+  const [availableCostCenters, setAvailableCostCenters] = useState([]);
+  const [selectedCostCenters, setSelectedCostCenters] = useState([]);
+  const isFINCORP = user?.cost_center === 'FIN&CORP';
 
 
   useEffect(() => {
     const fetchPNL = async () => {
+      setLoading(true);
       try {
+        const paramsnow = { glyear: 2025, _: Date.now() };
+
+        const paramsprev = { glyear: 2024, _: Date.now() };
+
+        if (isFINCORP) {
+          if (selectedProfitCenters.length > 0) {
+            paramsnow.profit_centers = selectedProfitCenters;
+            paramsprev.profit_centers = selectedProfitCenters;
+          }
+          if (selectedCostCenters.length > 0) {
+            paramsnow.cost_centers = selectedCostCenters;
+            paramsprev.cost_centers = selectedCostCenters;
+          }
+        } else {
+          paramsnow.company = user?.cost_center_name;
+          paramsprev.company = user?.cost_center_name;
+        }
         const [res2024, res2025] = await Promise.all([
-          axiosInstance.get('/report/pnl', {
-            params: {
-              glyear: 2024,
-              company: user?.company_name,
-              _: Date.now()
-            }
-          }),
-          axiosInstance.get('/report/pnl', {
-            params: {
-              glyear: 2025,
-              company: user?.company_name,
-              _: Date.now()
-            }
-          })
+          axiosInstance.get('/report/pnl', { params: paramsprev }),
+          axiosInstance.get('/report/pnl', { params: paramsnow })
         ]);
+        
         setData2024(res2024.data.data || []);
         setData2025(res2025.data.data || []);
       } catch (err) {
@@ -55,8 +68,111 @@ const Dashboard = () => {
         setLoading(false);
       }
     };
-    fetchPNL();
-  }, [user]);
+
+    if (user?.company_name) fetchPNL();
+  }, [user, selectedProfitCenters, selectedCostCenters]);
+
+
+  useEffect(() => {
+    const fetchStructure = async () => {
+      if (!isFINCORP) return;
+
+      try {
+        const res = await axiosInstance.get('/report/company-structure');
+        const pcs = res.data.profit_centers || [];
+        const ccs = res.data.cost_centers || [];
+
+        setAvailableProfitCenters(pcs);
+        setAvailableCostCenters(ccs);
+        setSelectedProfitCenters(pcs);
+        setSelectedCostCenters(ccs);
+      } catch (err) {
+        console.error('Failed to load company structure', err);
+      }
+    };
+
+    fetchStructure();
+  }, [isFINCORP]);
+
+  const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
+    const [anchorEl, setAnchorEl] = useState(null);
+    const open = Boolean(anchorEl);
+
+    const allSelected = selected.length === options.length;
+
+    const handleToggle = (value) => {
+      const current = selected.includes(value);
+      const newSelected = current
+        ? selected.filter((v) => v !== value)
+        : [...selected, value];
+      onChange(newSelected);
+    };
+
+    const handleSelectAllToggle = () => {
+      if (allSelected) {
+        onChange([]);
+      } else {
+        onChange(options);
+      }
+    };
+
+    return (
+      <>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={(e) => setAnchorEl(e.currentTarget)}
+          sx={{ minWidth: 180, textTransform: 'none' }}
+        >
+          {allSelected ? `All ${label}` : `${selected.length} ${label}`}
+        </Button>
+        <Menu
+          anchorEl={anchorEl}
+          open={open}
+          onClose={() => setAnchorEl(null)}
+          PaperProps={{ style: { maxHeight: 300, width: 240 } }}
+        >
+          <MenuItem onClick={handleSelectAllToggle}>
+            <Checkbox checked={allSelected} />
+            <ListItemText primary="Select All" />
+          </MenuItem>
+          {options.map((option) => (
+            <MenuItem key={option} onClick={() => handleToggle(option)}>
+              <Checkbox checked={selected.includes(option)} />
+              <ListItemText primary={option} />
+            </MenuItem>
+          ))}
+        </Menu>
+      </>
+    );
+  };
+
+
+  const ProfitAndCostFilter = ({
+    profitCenters = [],
+    costCenters = [],
+    selectedProfitCenters = [],
+    selectedCostCenters = [],
+    onChange = () => { }
+  }) => {
+    return (
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+        <MultiSelectDropdown
+          label="Profit Centers"
+          options={profitCenters}
+          selected={selectedProfitCenters}
+          onChange={(newProfits) => onChange(newProfits, selectedCostCenters)}
+        />
+        <MultiSelectDropdown
+          label="Cost Centers"
+          options={costCenters}
+          selected={selectedCostCenters}
+          onChange={(newCosts) => onChange(selectedProfitCenters, newCosts)}
+        />
+      </Stack>
+    );
+  };
+
 
   const getYTD = (values) => months.reduce((sum, m) => sum + (parseFloat(values[m]) || 0), 0);
 
@@ -152,7 +268,7 @@ const Dashboard = () => {
         borderColor: '#1976d2',
         backgroundColor: '#1976d2',
         tension: 0.3,
-          yAxisID: 'y'
+        yAxisID: 'y'
       },
       {
         label: 'Revenue 2024',
@@ -160,7 +276,7 @@ const Dashboard = () => {
         borderColor: '#90caf9',
         backgroundColor: '#90caf9',
         tension: 0.3,
-          yAxisID: 'y'
+        yAxisID: 'y'
       },
       {
         label: 'Direct Expenses 2025',
@@ -168,7 +284,7 @@ const Dashboard = () => {
         borderColor: '#ffa726',
         backgroundColor: '#ffa726',
         tension: 0.3,
-          yAxisID: 'y1'
+        yAxisID: 'y1'
       },
       {
         label: 'Direct Expenses 2024',
@@ -176,9 +292,9 @@ const Dashboard = () => {
         borderColor: '#ffcc80',
         backgroundColor: '#ffcc80',
         tension: 0.3,
-          yAxisID: 'y1'
+        yAxisID: 'y1'
       }
-      
+
     ]
   };
 
@@ -290,6 +406,21 @@ const Dashboard = () => {
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" sx={{ mb: 4 }}>📊 Financial Dashboard</Typography>
 
+      {isFINCORP && (
+        <Box sx={{ mb: 3 }}>
+          <ProfitAndCostFilter
+            profitCenters={availableProfitCenters}
+            costCenters={availableCostCenters}
+            selectedProfitCenters={selectedProfitCenters}
+            selectedCostCenters={selectedCostCenters}
+            onChange={(profits, costs) => {
+              setSelectedProfitCenters(profits);
+              setSelectedCostCenters(costs);
+            }}
+          />
+        </Box>
+      )}
+
       <Grid container spacing={3}>
         {summaryCard('Revenue', revenueThisYear, revenueLastYear)}
         {summaryCard('Cost of Sales', costThisYear, costLastYear, 'error.main')}
@@ -377,7 +508,7 @@ const Dashboard = () => {
                     }
                   }
                 }}
-                
+
               />
             </CardContent>
           </Card>
