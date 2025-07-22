@@ -5,7 +5,7 @@ import {
   TableBody, TableCell, TableHead, TableRow, TableContainer,
   FormControlLabel, Switch, Fade, Skeleton, IconButton, Button, Tooltip, Stack,
   FormControl, InputLabel, Select, MenuItem, Checkbox, Menu, ListItemText,
-  Dialog, DialogTitle, DialogContent, DialogActions
+  Dialog, DialogTitle, DialogContent, DialogActions, TableSortLabel
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { ExpandMore, ChevronRight, UnfoldLess, UnfoldMore } from '@mui/icons-material';
@@ -82,6 +82,9 @@ const ReportPNL = () => {
 
 
 
+  const [order, setOrder] = useState('asc');
+  const [orderBy, setOrderBy] = useState('cost_center');
+
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
@@ -156,6 +159,23 @@ const ReportPNL = () => {
     }
     return () => clearTimeout(timeoutRef.current);
   }, [switching]);
+
+  const handleSort = (property) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
+
+  const sortedDetailRecords = useMemo(() => {
+    return [...detailRecords].sort((a, b) => {
+      const aValue = orderBy === 'amount' ? parseFloat(a[orderBy]) : (a[orderBy] || '');
+      const bValue = orderBy === 'amount' ? parseFloat(b[orderBy]) : (b[orderBy] || '');
+
+      if (aValue < bValue) return order === 'asc' ? -1 : 1;
+      if (aValue > bValue) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [detailRecords, order, orderBy]);
 
 
   const convertCurrency = (value) => {
@@ -338,25 +358,47 @@ const ReportPNL = () => {
           )}
           {[sub1].filter(Boolean).join(' ')}
         </TableCell>
-        <TableCell align="right" onClick={() =>
-          handleCellClick({
-            type: 'lvl1',
-            lvl1,
-            month: "YTD"
-          })} sx={{ backgroundColor: colorLvl1, fontWeight: 800, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
-          {convertAndScaleValue(YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </TableCell>
-        {months.map(month => (
-          <TableCell key={month} align="right" onClick={() =>
+        <TableCell
+          align="right"
+          onClick={!isFormulaRow ? () =>
             handleCellClick({
               type: 'lvl1',
               lvl1,
-              month
-            })} sx={{ backgroundColor: colorLvl1, fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+              month: "YTD",
+              sub1
+            }) : undefined}
+          sx={{
+            backgroundColor: colorLvl1,
+            fontWeight: 800,
+            cursor: !isFormulaRow ? 'pointer' : 'default',
+            '&:hover': !isFormulaRow ? { textDecoration: 'underline' } : undefined
+          }}
+        >
+          {convertAndScaleValue(YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </TableCell>
+        {months.map(month => (
+          <TableCell
+            key={month}
+            align="right"
+            onClick={!isFormulaRow ? () =>
+              handleCellClick({
+                type: 'lvl1',
+                lvl1,
+                month,
+                sub1
+              }) : undefined}
+            sx={{
+              backgroundColor: colorLvl1,
+              fontWeight: 600,
+              cursor: !isFormulaRow ? 'pointer' : 'default',
+              '&:hover': !isFormulaRow ? { textDecoration: 'underline' } : undefined
+            }}
+          >
             {convertAndScaleValue(m1[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </TableCell>
         ))}
       </motion.tr>
+
     );
 
     if (expanded[key1] && !isFormulaRow) {
@@ -374,8 +416,9 @@ const ReportPNL = () => {
               onClick={() =>
                 handleCellClick({
                   type: 'lvl2',
-                  lvl1, lvl2: lvl2.lvl2,
-                  month: "YTD"
+                  lvl1, lvl2: lvl2,
+                  month: "YTD",
+                  sub1
                 })} sx={{ backgroundColor: colorLvl2, fontWeight: 800, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
               {convertAndScaleValue(lvl2.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </TableCell>
@@ -384,8 +427,9 @@ const ReportPNL = () => {
                 onClick={() =>
                   handleCellClick({
                     type: 'lvl2',
-                    lvl1, lvl2: lvl2.lvl2,
-                    month
+                    lvl1, lvl2: lvl2,
+                    month,
+                    sub1
                   })}
                 sx={{ backgroundColor: colorLvl2, fontWeight: 500, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }} >
                 {convertAndScaleValue(lvl2.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -409,8 +453,9 @@ const ReportPNL = () => {
                   onClick={() =>
                     handleCellClick({
                       type: 'lvl3',
-                      lvl1, lvl2, lvl3: lvl3.lvl3,
-                      month: "YTD"
+                      lvl1, lvl2, lvl3,
+                      month: "YTD",
+                      sub1
                     })}
                   sx={{ backgroundColor: colorLvl3, fontWeight: 800, color: 'gray', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                   {convertAndScaleValue(lvl3.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -420,8 +465,9 @@ const ReportPNL = () => {
                     onClick={() =>
                       handleCellClick({
                         type: 'lvl3',
-                        lvl1, lvl2, lvl3: lvl3.lvl3,
-                        month
+                        lvl1, lvl2, lvl3,
+                        month,
+                        sub1
                       })}
                     sx={{ backgroundColor: colorLvl3, fontWeight: 500, color: 'gray', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                     {convertAndScaleValue(lvl3.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -442,7 +488,8 @@ const ReportPNL = () => {
                           type: 'gl',
                           gl_code: item.gl_code,
                           lvl1, lvl2, lvl3,
-                          month: 'YTD'
+                          month: 'YTD',
+                          sub1
                         })}
                       sx={{ backgroundColor: '#ffffff', fontWeight: 700, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                       {convertAndScaleValue(calculateYTD(item.values)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -454,7 +501,8 @@ const ReportPNL = () => {
                             type: 'gl',
                             gl_code: item.gl_code,
                             lvl1, lvl2, lvl3,
-                            month
+                            month,
+                            sub1
                           })}
                         sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                         {convertAndScaleValue((parseFloat(item.values[month])) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -471,30 +519,36 @@ const ReportPNL = () => {
     return rows;
   }
 
-  const handleCellClick = async ({ type, gl_code, lvl1, lvl2, lvl3, month }) => {
+  const handleCellClick = async ({ type, gl_code, lvl1, lvl2, lvl3, month,sub1 }) => {
     if (user?.cost_center !== 'FIN&CORP') return;
 
     setDetailModalOpen(true);
     setDetailLoading(true);
-    setDetailParams({ type, gl_code, lvl1, lvl2, lvl3, month });
+    setDetailParams({ type, gl_code, lvl1, lvl2, lvl3, month, sub1 });
+
+    // 构建请求参数
+    const params = {
+      year: 2025,
+      month,
+      type,
+      profit_centers: selectedProfitCenters,
+      cost_centers: selectedCostCenters
+    };
+
+    if (type === 'gl' && gl_code) {
+      params.gl_code = gl_code;
+    }
+
+    if (lvl1 !== undefined) params.lvl1 = lvl1;
+    if (lvl2 !== undefined) params.lvl2 = lvl2.lvl2;
+    if (lvl3 !== undefined) params.lvl3 = lvl3.lvl3;
 
     try {
-      const res = await axiosInstance.get('/report/details', {
-        params: {
-          year: 2025,
-          month,
-          type,
-          gl_code,
-          lvl1,
-          lvl2,
-          lvl3,
-          profit_centers: selectedProfitCenters,
-          cost_centers: selectedCostCenters,
-        }
-      });
+      const res = await axiosInstance.get('/report/details', { params });
       setDetailRecords(res.data?.records || []);
     } catch (err) {
       console.error('❌ Failed to fetch detail records:', err);
+      setDetailRecords([]);
     } finally {
       setDetailLoading(false);
     }
@@ -502,13 +556,43 @@ const ReportPNL = () => {
 
 
 
+
   return (
     <>
       <Dialog open={detailModalOpen} onClose={() => setDetailModalOpen(false)} maxWidth="lg" fullWidth>
-        <DialogTitle>
-          Details for {detailParams?.month === 'YTD' ? 'YTD' : detailParams?.month}
+        <DialogTitle
+          sx={{
+            backgroundColor: '#e6ebf0',
+            fontWeight: 600,
+            fontSize: '1.1rem',
+            color: '#3a3f4a'
+          }}
+        >
+          {(() => {
+            const monthLabel = detailParams?.month === 'YTD' ? 'YTD' : detailParams?.month;
+            const type = detailParams?.type;
+
+            if (type === 'gl') {
+              return `Title: ${detailParams?.gl_code} - ${detailRecords?.[0]?.gl_account_long_name || ''} (${monthLabel})`;
+            }
+
+            if (type === 'lvl3') {
+              return `Title: ${detailParams?.lvl3?.sub_title || ''} (${monthLabel})`;
+            }
+
+            if (type === 'lvl2') {
+              return `Title: ${detailParams?.lvl2?.sub2 || ''} (${monthLabel})`;
+            }
+
+            if (type === 'lvl1') {
+              return `Title: ${detailParams?.sub1 || ''} (${monthLabel})`;
+            }
+
+            return `Details for ${monthLabel}`;
+          })()}
         </DialogTitle>
-        <DialogContent>
+
+        <DialogContent sx={{ backgroundColor: '#f8f9fa', px: 2, py: 2 }}>
           {detailLoading ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <CircularProgress />
@@ -516,35 +600,94 @@ const ReportPNL = () => {
           ) : detailRecords.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No records found.</Typography>
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-
-                  <TableCell>Cost Center</TableCell>
-                  <TableCell>GL Code</TableCell>
-                  <TableCell align="right">Amount</TableCell>
-
-
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {detailRecords.map((rec, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{rec.cost_center}</TableCell>
-                    <TableCell>{rec.gl_code}</TableCell>
-
-                    <TableCell align="right">{parseFloat(rec.amount).toLocaleString()}</TableCell>
-
+            <>
+              <Box
+                sx={{
+                  mb: 1,
+                  textAlign: 'right',
+                  pr: 2,
+                  py: 1,
+                  backgroundColor: '#dbe4dc',
+                  borderRadius: 1
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={600} color="text.primary">
+                  Total: {detailRecords.reduce((sum, rec) => sum + (parseFloat(rec.amount) || 0), 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 2
+                  })}
+                </Typography>
+              </Box>
+              <Table size="small" sx={{
+                border: '1px solid #cfd8dc',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}>
+                <TableHead sx={{ backgroundColor: '#d7dee4' }}>
+                  <TableRow>
+                    <TableCell sortDirection={orderBy === 'cost_center' ? order : false}>
+                      <TableSortLabel
+                        active={orderBy === 'cost_center'}
+                        direction={orderBy === 'cost_center' ? order : 'asc'}
+                        onClick={() => handleSort('cost_center')}
+                      >
+                        Cost Center
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell sortDirection={orderBy === 'gl_code' ? order : false}>
+                      <TableSortLabel
+                        active={orderBy === 'gl_code'}
+                        direction={orderBy === 'gl_code' ? order : 'asc'}
+                        onClick={() => handleSort('gl_code')}
+                      >
+                        GL Code
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right" sortDirection={orderBy === 'amount' ? order : false}>
+                      <TableSortLabel
+                        active={orderBy === 'amount'}
+                        direction={orderBy === 'amount' ? order : 'asc'}
+                        onClick={() => handleSort('amount')}
+                      >
+                        Amount
+                      </TableSortLabel>
+                    </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {sortedDetailRecords.map((rec, idx) => (
+                    <TableRow key={idx} hover>
+                      <TableCell sx={{ color: '#495057' }}>{rec.cost_center}</TableCell>
+                      <TableCell sx={{ color: '#495057' }}>
+                        {rec.gl_code} - {rec.gl_account_long_name || ''}
+                      </TableCell>
+                      <TableCell align="right" sx={{ color: '#495057' }}>
+                        {parseFloat(rec.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailModalOpen(false)}>Close</Button>
+        <DialogActions sx={{ backgroundColor: '#f1f3f4', px: 3, py: 2 }}>
+          <Button
+            onClick={() => setDetailModalOpen(false)}
+            sx={{
+              backgroundColor: '#c4c9cc',
+              color: '#333',
+              fontWeight: 500,
+              '&:hover': {
+                backgroundColor: '#b0b5b8'
+              }
+            }}
+          >
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
+
+
 
       <Box sx={{ p: 4 }}>
         <Typography variant="h4" sx={{ mb: 2 }}>P&L Report (2025)</Typography>
