@@ -116,10 +116,10 @@ const Header = () => {
             anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
             transformOrigin={{ vertical: 'top', horizontal: 'left' }}
           >
-            <MenuItem onClick={() => { handleReportMenuClose(); navigate('/report/pnl'); }}>PNL Report</MenuItem>
-            {/* <MenuItem onClick={() => { handleReportMenuClose(); navigate('/report/pnl-summary'); }}>
-              PNL Summary
-            </MenuItem> */}
+            <MenuItem onClick={() => { handleReportMenuClose(); navigate('/report/pnl'); }}>PNL </MenuItem>
+            <MenuItem onClick={() => { handleReportMenuClose(); navigate('/report/ppe'); }}>
+              PPE
+            </MenuItem>
 
           </Menu>
         </Box>

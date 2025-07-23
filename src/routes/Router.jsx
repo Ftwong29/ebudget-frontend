@@ -8,6 +8,7 @@ import LoginPage from '../pages/Login';
 import DashboardPage from '../pages/Dashboard';
 import ReportPNL from '../pages/ReportPNL';
 import ReportPNLSummary from '../pages/ReportPNLSummary';
+import ReportPPE from '../pages/ReportPPE';
 
 const Router = () => {
   return (
@@ -62,6 +63,14 @@ const Router = () => {
           element={
             <PrivateRoute>
               <ReportPNLSummary />
+            </PrivateRoute>
+          }
+        />
+         <Route
+          path="/report/ppe"
+          element={
+            <PrivateRoute>
+              <ReportPPE />
             </PrivateRoute>
           }
         />
