@@ -344,7 +344,7 @@ const ReportPNL = () => {
 
     const isFormulaRow = !Number.isInteger(parseFloat(lvl1));
 
-    const colorLvl1 = isFormulaRow ? '#fdf6e3' : '#bbdefb';
+    const colorLvl1 = isFormulaRow ? '#FFF8DB' : '#EAE6FA';
     const colorLvl2 = '#cfe2f3';
     const colorLvl3 = '#e6f0fa';
 
@@ -443,7 +443,7 @@ const ReportPNL = () => {
             const k3 = `${lvl1}-${lvl2.lvl2}-${lvl3.lvl3}`;
             rows.push(
               <motion.tr key={k3} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <TableCell colSpan={2} sx={{ pl: 6, backgroundColor: colorLvl3, fontWeight: 500, color: 'gray' }}>
+                <TableCell colSpan={2} sx={{ pl: 6, backgroundColor: colorLvl3, fontWeight: 500 }}>
                   <IconButton size="small" onClick={() => toggleExpand(k3)}>
                     {expanded[k3] ? <ExpandMore /> : <ChevronRight />}
                   </IconButton>
@@ -457,7 +457,7 @@ const ReportPNL = () => {
                       month: "YTD",
                       sub1
                     })}
-                  sx={{ backgroundColor: colorLvl3, fontWeight: 800, color: 'gray', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                  sx={{ backgroundColor: colorLvl3, fontWeight: 800, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                   {convertAndScaleValue(lvl3.YTD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </TableCell>
                 {months.map(month => (
@@ -469,7 +469,7 @@ const ReportPNL = () => {
                         month,
                         sub1
                       })}
-                    sx={{ backgroundColor: colorLvl3, fontWeight: 500, color: 'gray', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                    sx={{ backgroundColor: colorLvl3, fontWeight: 500, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                     {convertAndScaleValue(lvl3.months[month]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                 ))}

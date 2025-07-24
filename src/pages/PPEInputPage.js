@@ -138,11 +138,11 @@ const PPEInputPage = () => {
     <Box sx={{ padding: 4, bgcolor: '#fdfdfb', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
       <Typography variant="h4" sx={{ mb: 1, color: '#4b4a47', fontWeight: 'bold' }}>PPE Input for 2025</Typography>
       {lastSavedAt && <Typography variant="body2" sx={{ mb: 2, color: '#7a7a7a' }}>Last saved at: {new Date(lastSavedAt).toLocaleString()}</Typography>}
-      <Button variant="contained" sx={{ mb: 3, bgcolor: '#f0e3d3', color: '#4b4a47' }} onClick={handleSave}>Save All</Button>
+      <Button variant="contained" onClick={handleSave}>Save All</Button>
 
       {ppeCategories.map(category => (
         <Accordion key={category} sx={{ mb: 2, borderRadius: 2 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: '#f0e3d3' }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: '#c8e6c9' }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'medium', color: '#4b4a47' }}>
               {category} — Subtotal: {formatNumber(calculateCategorySubtotal(category))}
             </Typography>

@@ -195,6 +195,26 @@ const ReportPPE = () => {
 
     const allExpanded = groupedRecords.every(g => groupExpanded[g.category]);
 
+    const grandTotalYTD = groupedRecords.reduce((total, group) => {
+        return total + group.items.reduce((sum, item) => sum + months.reduce((s, m) => s + parseFloat(item.values?.[m] || 0), 0), 0);
+    }, 0);
+
+    const grandTotalUnitsYTD = groupedRecords.reduce((total, group) => {
+        return total + group.items.reduce((sum, item) => sum + months.reduce((s, m) => s + parseFloat(item.units?.[m] || 0), 0), 0);
+    }, 0);
+
+    const grandTotalMonthlySummary = months.map(m => {
+        const totalLC = groupedRecords.reduce((total, group) => {
+            return total + group.items.reduce((sum, item) => sum + parseFloat(item.values?.[m] || 0), 0);
+        }, 0);
+
+        const totalUnit = groupedRecords.reduce((total, group) => {
+            return total + group.items.reduce((sum, item) => sum + parseFloat(item.units?.[m] || 0), 0);
+        }, 0);
+
+        return { lc: totalLC, unit: totalUnit };
+    });
+
     return (
         <Box sx={{ p: 4 }}>
             <Typography variant="h4" sx={{ mb: 2 }}>PPE Report (2025)</Typography>
@@ -279,14 +299,41 @@ const ReportPPE = () => {
                 // updated section only
                 <TableContainer component={Paper}>
                     <Table size="small" stickyHeader>
+                        {/* Grand Total Row */}
+                        <TableRow sx={{ backgroundColor: '#FFF8DB', fontWeight: 'bold' }}>
+                            <TableCell colSpan={3} align="right" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>
+                                Total
+                            </TableCell>
+
+                            <TableCell colSpan={2} align="right">
+                                <div style={{ fontWeight: 'bold', color: '#222', fontSize: '1rem' }}>
+                                    {convertAndScale(grandTotalYTD).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </div>
+                                <div style={{ fontSize: '0.8em', color: '#555' }}>
+                                    {grandTotalUnitsYTD} unit
+                                </div>
+                            </TableCell>
+
+                            {grandTotalMonthlySummary.map((val, idx) => (
+                                <TableCell key={`grand-${idx}`} align="right">
+                                    <div style={{ fontWeight: 'bold', color: '#222', fontSize: '1rem' }}>
+                                        {convertAndScale(val.lc).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </div>
+                                    <div style={{ fontSize: '0.8em', color: '#555' }}>
+                                        {val.unit} unit
+                                    </div>
+                                </TableCell>
+                            ))}
+                        </TableRow>
+
                         <TableHead>
                             <TableRow>
                                 <TableCell>Category</TableCell>
                                 <TableCell></TableCell>
                                 <TableCell></TableCell>
                                 <TableCell></TableCell>
-                                <TableCell align="right">YTD Unit</TableCell>
-                                <TableCell align="right">YTD LC</TableCell>
+
+                                <TableCell align="right">YTD</TableCell>
                                 {months.map(month => (
                                     <TableCell key={`head-${month}`} align="right">{month}</TableCell>
                                 ))}
@@ -303,34 +350,36 @@ const ReportPPE = () => {
                                 });
                                 return (
                                     <React.Fragment key={group.category}>
-                                        <TableRow sx={{ backgroundColor: '#e6e3e0', fontWeight: 600 }}>
-                                            <TableCell colSpan={1}>
+                                        <TableRow sx={{ backgroundColor: '#EAE6FA', fontWeight: 600 }}>
+                                            <TableCell colSpan={1} sx={{ fontWeight: 'bold' }}>
                                                 <IconButton size="small" onClick={() => toggleGroup(group.category)}>
                                                     {groupExpanded[group.category] ? <ExpandMore /> : <ChevronRight />}
                                                 </IconButton>
                                                 {group.category}
                                             </TableCell>
-                                            <TableCell colSpan={2} align="right">Subtotal</TableCell>
-                                            <TableCell />
-                                            <TableCell align="right">{groupYTDUnit}</TableCell>
-                                            <TableCell align="right">{convertAndScale(groupYTD).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                            <TableCell colSpan={2} align="right" sx={{ fontWeight: 'bold' }}>Subtotal</TableCell>
+
+                                            <TableCell colSpan={2} align="right">
+                                                <div style={{ fontWeight: 'bold', color: '#444' }}>{convertAndScale(groupYTD).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                                <div style={{ fontSize: '0.75em', color: '#888' }}>{groupYTDUnit} unit</div>
+                                            </TableCell>
                                             {groupMonthlySummary.map((val, idx) => (
                                                 <TableCell key={`sub-${idx}`} align="right">
-                                                    <div style={{ fontWeight: 600, color: '#444' }}>{convertAndScale(val.lc).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                                    <div style={{ fontWeight: 'bold', color: '#444' }}>{convertAndScale(val.lc).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                                     <div style={{ fontSize: '0.75em', color: '#888' }}>{val.unit} unit</div>
                                                 </TableCell>
                                             ))}
                                         </TableRow>
 
+
                                         {groupExpanded[group.category] && (
                                             <>
-                                                <TableRow sx={{ backgroundColor: '#f0efed' }}>
+                                                <TableRow sx={{ backgroundColor: '#cfe2f3' }}>
                                                     <TableCell>Cost Center</TableCell>
                                                     <TableCell>Description</TableCell>
                                                     <TableCell>Purpose</TableCell>
                                                     <TableCell>Cost/Unit</TableCell>
-                                                    <TableCell align="right">YTD Unit</TableCell>
-                                                    <TableCell align="right">YTD LC</TableCell>
+                                                    <TableCell align="right">YTD</TableCell>
                                                     {months.map(month => (
                                                         <TableCell key={`head-${month}`} align="right">{month}</TableCell>
                                                     ))}
@@ -345,16 +394,17 @@ const ReportPPE = () => {
                                                             <TableCell>{item.description}</TableCell>
                                                             <TableCell>{item.purpose}</TableCell>
                                                             <TableCell align="right">{convertAndScale(parseFloat(item.unitCost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                                                            <TableCell align="right">{ytdUnit}</TableCell>
-                                                            <TableCell align="right" sx={{ fontWeight: 600 }}>
-                                                                {convertAndScale(ytd).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                            <TableCell align="right" >
+                                                                <div style={{ color: '#444' }}>{convertAndScale(ytd).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                                                <div style={{ fontSize: '0.75em', color: '#888' }}>{ytdUnit} unit</div>
+
                                                             </TableCell>
                                                             {months.map(month => {
                                                                 const unit = parseFloat(item.units?.[month] || 0);
                                                                 const lc = convertAndScale(parseFloat(item.values?.[month] || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 });
                                                                 return (
                                                                     <TableCell key={`month-${month}-${idx}`} align="right">
-                                                                        <div style={{ fontWeight: 600, color: '#333' }}>{lc}</div>
+                                                                        <div style={{ color: '#333' }}>{lc}</div>
                                                                         <div style={{ fontSize: '0.75em', color: '#999' }}>{unit} unit</div>
                                                                     </TableCell>
                                                                 );
