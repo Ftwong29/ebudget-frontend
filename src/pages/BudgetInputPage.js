@@ -37,6 +37,20 @@ const BudgetInputPage = () => {
   const [relatedGLInfo, setRelatedGLInfo] = useState([]);
   const [selectedGlCode, setSelectedGlCode] = useState('');
 
+  const [lockStatus, setLockStatus] = useState(null);
+
+  const loadLockStatus = async () => {
+    try {
+      const res = await axiosInstance.get('/budget-lock/status', {
+        params: { glyear: 2025 }
+      });
+      setLockStatus(res.data);
+    } catch (err) {
+      console.error('❌ Failed to load lock status:', err);
+    }
+  };
+
+
 
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -103,20 +117,6 @@ const BudgetInputPage = () => {
         params: { category: category.toLowerCase() }
       });
 
-      // if (category.toLowerCase() === 'related') {
-
-      //   const { glItems, groupedData, relatedGLInfo } = res.data;
-      //   setGlItems(glItems);
-      //   setGroupedCompanies(groupedData);
-      //   setRelatedGLInfo(relatedGLInfo || []); // ✅ 新加
-      //   setSelectedCompany('');
-      //   setAvailableProfitCenters([]);
-      //   setSelectedProfitCenter('');
-      // } else {
-      //   setGlItems(res.data.glItems || res.data);
-      // }
-
-
       const { glItems, groupedData, relatedGLInfo } = res.data;
       setGlItems(glItems);
       setGroupedCompanies(groupedData);
@@ -135,8 +135,12 @@ const BudgetInputPage = () => {
   };
 
   useEffect(() => {
-    if (user) fetchGLData(selectedCategory);
+    if (user) {
+      fetchGLData(selectedCategory);
+      loadLockStatus();
+    }
   }, [selectedCategory, user]);
+
 
   useEffect(() => {
 
@@ -175,6 +179,18 @@ const BudgetInputPage = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [inputValues, initialValues]);
+  
+  useEffect(() => {
+    const refreshOnSubmit = () => {
+      loadLockStatus(); // ✅ 重新拉锁状态
+    };
+
+    window.addEventListener('budget-submitted', refreshOnSubmit);
+
+    return () => {
+      window.removeEventListener('budget-submitted', refreshOnSubmit);
+    };
+  }, []);
 
 
   const handleOpenDialog = (item) => {
@@ -256,6 +272,9 @@ const BudgetInputPage = () => {
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
   if (!user) return <Box sx={{ padding: 4 }}><Typography>Loading user info...</Typography></Box>;
+  const isSubmitted = lockStatus?.is_submitted;
+  const isCategoryLocked = lockStatus?.category_locks?.[selectedCategory.toLowerCase()];
+  const isEditable = !isSubmitted && !isCategoryLocked;
 
   return (
     <Box sx={{ padding: 4, height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -264,12 +283,36 @@ const BudgetInputPage = () => {
       {lastSavedAt && <Typography variant="body2" sx={{ mb: 1 }}>Last Saved At: {new Date(lastSavedAt).toLocaleString()}</Typography>}
 
       <Tabs value={selectedCategory} onChange={handleCategoryChange} sx={{ mb: 2 }}>
-        {budgetCategories.map((cat) => <Tab key={cat} label={cat} value={cat} />)}
+        {budgetCategories.map((cat) => {
+          const lowerCat = cat.toLowerCase();
+          const isLocked = lockStatus?.category_locks?.[lowerCat];
+          const isSubmitted = lockStatus?.is_submitted;
+
+          // ✅ 如果已提交 -> 打勾；否则判断是否该类别被锁
+          const icon = isSubmitted
+            ? '✅'
+            : isLocked
+              ? '🔒'
+              : '';
+
+          return (
+            <Tab
+              key={cat}
+              value={cat}
+              label={`${icon} ${cat}`}
+            />
+          );
+        })}
       </Tabs>
+
 
       <Box sx={{ mb: 2, backgroundColor: '#c8e6c9', p: 2, borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 1000 }}>
         <Typography variant="h6">Grand Total: {formatNumber(grandTotal)} {prevGrandTotal > 0 && <Typography variant="caption" sx={{ ml: 2 }}>Prev: {formatNumber(prevGrandTotal)}</Typography>}</Typography>
-        <Button variant="contained" onClick={handleSave}>Save</Button>
+        {(!isSubmitted && !isCategoryLocked) && (
+          <Button variant="contained" onClick={handleSave}>
+            Save
+          </Button>
+        )}
       </Box>
 
       <Box sx={{ flex: 1, overflowY: 'auto', pr: 1 }}>
@@ -308,10 +351,28 @@ const BudgetInputPage = () => {
                           <Grid container alignItems="center">
                             <Grid item xs={8}><Typography>{item.gl_code} - {item.gl_account_long_name}</Typography></Grid>
                             <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                              <Button variant="outlined" onClick={() => handleOpenDialog(item)} size="small">Total: {formatNumber(calculateItemTotal(item.gl_code))}</Button>
-                              {calculateItemTotal(item.gl_code, previousValues) > 0 && (
-                                <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>Prev: {formatNumber(calculateItemTotal(item.gl_code, previousValues))}</Typography>
+                              {isSubmitted || isCategoryLocked ? (
+                                <Box sx={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {isSubmitted ? '✅' : '🔒'} Total: {formatNumber(calculateItemTotal(item.gl_code))}
+                                  </Typography>
+                                  {(calculateItemTotal(item.gl_code, previousValues) > 0) && (
+                                    <Typography variant="caption" sx={{ mt: 0.5 }} color="text.disabled">
+                                      Prev: {formatNumber(calculateItemTotal(item.gl_code, previousValues))}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              ) : (
+                                <Button
+                                  variant="outlined"
+                                  onClick={() => handleOpenDialog(item)}
+                                  size="small"
+                                >
+                                  Total: {formatNumber(calculateItemTotal(item.gl_code))}
+                                </Button>
                               )}
+
+
                             </Grid>
                           </Grid>
                         </Paper>

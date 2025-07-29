@@ -1,82 +1,45 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import MainLayout from '../layouts/MainLayout';
 import PrivateRoute from './PrivateRoute';
 import BudgetInputPage from '../pages/BudgetInputPage';
 import BudgetUploadPage from '../pages/BudgetUploadPage';
-import PPEInputPage from '../pages/PPEInputPage'; // ✅ 新增导入
+import PPEInputPage from '../pages/PPEInputPage';
 import LoginPage from '../pages/Login';
 import DashboardPage from '../pages/Dashboard';
+import SuperDashboardPage from '../pages/SuperDashboard';
 import ReportPNL from '../pages/ReportPNL';
 import ReportPNLSummary from '../pages/ReportPNLSummary';
 import ReportPPE from '../pages/ReportPPE';
 
+const DashboardWrapper = () => {
+  const { user } = useSelector((state) => state.auth);
+  console.log('user permission, ', user);
+  return user?.is_superuser ? <SuperDashboardPage /> : <DashboardPage />;
+};
+
 const Router = () => {
   return (
     <Routes>
-      {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Protected Routes */}
-      <Route element={<MainLayout />}>
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <DashboardPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/budget-input"
-          element={
-            <PrivateRoute>
-              <BudgetInputPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/budget-upload"
-          element={
-            <PrivateRoute>
-              <BudgetUploadPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/ppe-input"
-          element={
-            <PrivateRoute>
-              <PPEInputPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/report/pnl"
-          element={
-            <PrivateRoute>
-              <ReportPNL />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/report/pnl-summary"
-          element={
-            <PrivateRoute>
-              <ReportPNLSummary />
-            </PrivateRoute>
-          }
-        />
-         <Route
-          path="/report/ppe"
-          element={
-            <PrivateRoute>
-              <ReportPPE />
-            </PrivateRoute>
-          }
-        />
+      <Route
+        path="/"
+        element={
+          <PrivateRoute>
+            <MainLayout />
+          </PrivateRoute>
+        }
+      >
+        <Route path="dashboard" element={<DashboardWrapper />} />
+        <Route path="budget-input" element={<BudgetInputPage />} />
+        <Route path="budget-upload" element={<BudgetUploadPage />} />
+        <Route path="ppe-input" element={<PPEInputPage />} />
+        <Route path="report/pnl" element={<ReportPNL />} />
+        <Route path="report/pnl-summary" element={<ReportPNLSummary />} />
+        <Route path="report/ppe" element={<ReportPPE />} />
       </Route>
 
-      {/* Catch all unmatched routes */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
