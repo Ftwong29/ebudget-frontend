@@ -14,7 +14,6 @@ import ReportPPE from '../pages/ReportPPE';
 
 const DashboardWrapper = () => {
   const { user } = useSelector((state) => state.auth);
-  console.log('user permission, ', user);
   return user?.is_superuser ? <SuperDashboardPage /> : <DashboardPage />;
 };
 

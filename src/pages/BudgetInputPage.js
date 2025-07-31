@@ -179,7 +179,7 @@ const BudgetInputPage = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [inputValues, initialValues]);
-  
+
   useEffect(() => {
     const refreshOnSubmit = () => {
       loadLockStatus(); // ✅ 重新拉锁状态
@@ -220,22 +220,30 @@ const BudgetInputPage = () => {
 
   const handleSave = async () => {
     try {
-
       const encryptedPayload = CryptoJS.AES.encrypt(JSON.stringify({
         glyear: 2025,
         currency: user?.currency || 'N/A',
+        category: selectedCategory.toLowerCase(), // ✅ 新增
         values: inputValues
       }), secretKey).toString();
-
+  
       await axiosInstance.post(`/gl/glinput-save`, { data: encryptedPayload });
-
+  
       setInitialValues(inputValues);
       setLastSavedAt(new Date());
       setSnackbarOpen(true);
     } catch (err) {
-      alert('Failed to save: ' + (err?.response?.data?.message || err.message));
+      const msg = err?.response?.data?.message || err.message;
+    
+      if (err?.response?.status === 403 && msg.includes('locked')) {
+        alert(`⚠️ This category has been locked by an admin.\n\nPlease refresh the page to update the lock status before editing.`);
+      } else {
+        alert('Failed to save: ' + msg);
+      }
     }
+    
   };
+  
 
 
   const handleProfitCenterChange = async (value: string, glCode?: string) => {
@@ -289,11 +297,12 @@ const BudgetInputPage = () => {
           const isSubmitted = lockStatus?.is_submitted;
 
           // ✅ 如果已提交 -> 打勾；否则判断是否该类别被锁
-          const icon = isSubmitted
-            ? '✅'
-            : isLocked
-              ? '🔒'
+          const icon = isLocked
+            ? '🔒'
+            : isSubmitted
+              ? '✅'
               : '';
+
 
           return (
             <Tab
@@ -354,8 +363,9 @@ const BudgetInputPage = () => {
                               {isSubmitted || isCategoryLocked ? (
                                 <Box sx={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                   <Typography variant="body2" color="text.secondary">
-                                    {isSubmitted ? '✅' : '🔒'} Total: {formatNumber(calculateItemTotal(item.gl_code))}
+                                    {isCategoryLocked ? '🔒' : isSubmitted ? '✅' : ''} Total: {formatNumber(calculateItemTotal(item.gl_code))}
                                   </Typography>
+
                                   {(calculateItemTotal(item.gl_code, previousValues) > 0) && (
                                     <Typography variant="caption" sx={{ mt: 0.5 }} color="text.disabled">
                                       Prev: {formatNumber(calculateItemTotal(item.gl_code, previousValues))}

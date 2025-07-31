@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
 import {
@@ -15,7 +15,7 @@ import { styled } from '@mui/material/styles';
 import CryptoJS from 'crypto-js';
 
 const secretKey = process.env.REACT_APP_SECRET_KEY;
-// 整体背景
+
 const Background = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
   backgroundColor: '#f5f7fa',
@@ -25,7 +25,6 @@ const Background = styled(Box)(({ theme }) => ({
   padding: theme.spacing(4),
 }));
 
-// 卡片区域
 const FormCard = styled(Paper)(({ theme }) => ({
   width: '100%',
   maxWidth: 420,
@@ -56,20 +55,37 @@ const SubmitButton = styled(Button)(({ theme }) => ({
 
 const LoginPageCenter = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
+
   const [formData, setFormData] = useState({
     cost_center_name: '',
     password: '',
   });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false); // 新增 loading 状态
+  const [warning, setWarning] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // ✅ 兼容 HashRouter：从 location.hash 解析参数
+    const hash = location.hash || ''; // e.g. #/login?reason=kicked
+    const query = hash.includes('?') ? hash.split('?')[1] : '';
+    const params = new URLSearchParams(query);
+    const reason = params.get('reason');
+
+    if (reason === 'kicked') {
+      setWarning('⚠️ This session has been terminated because your account was logged in from another device.');
+    } else if (reason === 'logout') {
+      setWarning('You have logged out successfully.');
+    } else if (reason === 'expired') {
+      setWarning('Your session has expired. Please log in again.');
+    }
+
     const token = localStorage.getItem('token');
     if (token) {
       navigate('/dashboard');
     }
-  }, [navigate]);
+  }, [navigate, location]);
 
   const handleChange = (e) => {
     setFormData({
@@ -81,12 +97,11 @@ const LoginPageCenter = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setWarning('');
     setLoading(true);
-
 
     try {
       const encrypted = CryptoJS.AES.encrypt(JSON.stringify(formData), secretKey).toString();
-   
       const result = await dispatch(login({ data: encrypted }));
 
       if (result.payload) {
@@ -101,7 +116,6 @@ const LoginPageCenter = () => {
     }
   };
 
-
   return (
     <Background>
       <FormCard elevation={3}>
@@ -111,6 +125,12 @@ const LoginPageCenter = () => {
         <Typography variant="subtitle1" sx={{ color: '#6c7a80', mb: 3 }}>
           Plan better. Budget smarter.
         </Typography>
+
+        {warning && (
+          <Alert severity="warning" sx={{ width: '100%' }}>
+            {warning}
+          </Alert>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ width: '100%' }}>

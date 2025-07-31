@@ -13,6 +13,3 @@ export const store = configureStore({
       serializableCheck: false,
     }),
 });
-
-// 2. 拦截器要放在 store create 后
-setupInterceptors(axiosInstance, store);

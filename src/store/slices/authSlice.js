@@ -28,7 +28,6 @@ export const logout = createAsyncThunk(
   }
 );
 
-// 🚀 新增：刷新用户资料（根据现有 token 请求 /auth/me）
 export const refreshUser = createAsyncThunk(
   'auth/refreshUser',
   async (_, { rejectWithValue }) => {
@@ -100,6 +99,13 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
         state.error = action.payload;
+
+        localStorage.removeItem('token');
+
+        // ✅ 若用户被踢，跳转到登录页并加提示参数
+        if (!window.location.href.includes('/login')) {
+          window.location.href = '/login?reason=kicked';
+        }
       });
   },
 });

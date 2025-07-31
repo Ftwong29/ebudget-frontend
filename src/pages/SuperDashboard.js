@@ -25,6 +25,10 @@ import {
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import BlockIcon from '@mui/icons-material/Block';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
+
 
 const morandiColors = {
     background: '#f0ebe3',
@@ -38,11 +42,55 @@ const morandiColors = {
 const SuperDashboardPage = () => {
     const [locks, setLocks] = useState([]);
     const [filteredLocks, setFilteredLocks] = useState([]);
-    const [statusFilter, setStatusFilter] = useState('submitted');
+    const [statusFilter, setStatusFilter] = useState('requested');
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const glyear = 2025;
+    const [selectedCategories, setSelectedCategories] = useState({});
+    const [selectedRegions, setSelectedRegions] = useState([]);
+    const [selectedProfitCenters, setSelectedProfitCenters] = useState([]);
+    const [selectedCostCenters, setSelectedCostCenters] = useState([]);
+    const [selectedCompanyIds, setSelectedCompanyIds] = useState([]);
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
+    const [snackbarSeverity, setSnackbarSeverity] = useState('success'); // 'success' | 'error' | 'info'
+    const [actionLoading, setActionLoading] = useState(false);
+
+    const budgetCategories = ['Sales', 'Trustee', 'Cost', 'NonOperating', 'Direct', 'Indirect', 'Manpower', 'Int, Tax, Depr.', 'Related'];
+
+
+    const [selectedLockCategories, setSelectedLockCategories] = useState(budgetCategories); // 默认全选
+
+    const showSnackbar = (message, severity = 'success') => {
+        setSnackbarMessage(message);
+        setSnackbarSeverity(severity);
+        setSnackbarOpen(true);
+    };
+
+
+    const unique = (arr) => [...new Set(arr)];
+
+    const allUsers = locks.map(l => l.userInfo).filter(Boolean);
+
+    const regionOptions = unique(allUsers.map(u => u.region));
+    const companyOptions = unique(
+        allUsers
+            .filter(u => selectedRegions.length === 0 || selectedRegions.includes(u.region))
+            .map(u => u.companyid)
+    );
+
+    const profitCenterOptions = unique(
+        allUsers
+            .filter(u =>
+                (selectedRegions.length === 0 || selectedRegions.includes(u.region)) &&
+                (selectedCompanyIds.length === 0 || selectedCompanyIds.includes(u.companyid))
+            )
+            .map(u => u.profit_center)
+    );
+    const costCenterOptions = unique(allUsers.map(u => u.cost_center));
+
+
 
     const fetchLocks = async () => {
         setLoading(true);
@@ -65,41 +113,90 @@ const SuperDashboardPage = () => {
         const timer = setTimeout(() => {
             let data = locks;
             if (statusFilter === 'submitted') {
-                data = locks.filter((l) => l.is_submitted);
+                data = data.filter((l) => l.is_submitted);
             } else if (statusFilter === 'not_submitted') {
-                data = locks.filter((l) => !l.is_submitted);
+                data = data.filter((l) => !l.is_submitted);
+            } else if (statusFilter === 'requested') {
+                data = data.filter((l) => l.unlock_requested === true);
             }
+
+
+            if (selectedRegions.length > 0) {
+                data = data.filter(l => selectedRegions.includes(l.userInfo?.region));
+            }
+            if (selectedCompanyIds.length > 0) {
+                data = data.filter(l => selectedCompanyIds.includes(l.userInfo?.companyid));
+            }
+            if (selectedProfitCenters.length > 0) {
+                data = data.filter(l => selectedProfitCenters.includes(l.userInfo?.profit_center));
+            }
+            if (selectedCostCenters.length > 0) {
+                data = data.filter(l => selectedCostCenters.includes(l.userInfo?.cost_center));
+            }
+
             setFilteredLocks(data);
             setPage(0);
             setLoading(false);
         }, 300);
         return () => clearTimeout(timer);
-    }, [locks, statusFilter]);
+    }, [locks, statusFilter, selectedRegions, selectedProfitCenters, selectedCostCenters]);
+
 
     const handleLock = async (cost_center_name, category) => {
-        await axiosInstance.post('/budget-lock/lock-category', {
-            cost_center_name,
-            glyear,
-            category
-        });
-        fetchLocks();
+        setActionLoading(true);
+        try {
+            await axiosInstance.post('/budget-lock/lock-category', {
+                cost_center_name,
+                glyear,
+                category
+            });
+            showSnackbar(`✅ '${category}' locked for ${cost_center_name}`);
+            fetchLocks();
+        } catch (err) {
+            console.error('Lock error:', err);
+            showSnackbar('❌ Lock failed', 'error');
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const handleUnlock = async (cost_center_name) => {
-        await axiosInstance.post('/budget-lock/unlock', {
-            cost_center_name,
-            glyear
-        });
-        fetchLocks();
+        setActionLoading(true);
+        try {
+            await axiosInstance.post('/budget-lock/unlock', {
+                cost_center_name,
+                glyear
+            });
+            showSnackbar(`🔓 Categories unlocked for ${cost_center_name}`);
+            fetchLocks();
+        } catch (err) {
+            console.error('Unlock error:', err);
+            showSnackbar('❌ Unlock failed', 'error');
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const handleReject = async (cost_center_name) => {
-        await axiosInstance.post('/budget-lock/reject', {
-            cost_center_name,
-            glyear
-        });
-        fetchLocks();
+        const confirmed = window.confirm(`Are you sure you want to reject & unlock "${cost_center_name}"?`);
+        if (!confirmed) return;
+
+        setActionLoading(true);
+        try {
+            await axiosInstance.post('/budget-lock/reject', {
+                cost_center_name,
+                glyear
+            });
+            showSnackbar(`🚫 Rejected & unlocked ${cost_center_name}`);
+            fetchLocks();
+        } catch (err) {
+            console.error('Reject error:', err);
+            showSnackbar('❌ Reject failed', 'error');
+        } finally {
+            setActionLoading(false);
+        }
     };
+
 
     const formatDate = (dateString) => {
         return dateString ? new Date(dateString).toLocaleString() : '-';
@@ -114,26 +211,212 @@ const SuperDashboardPage = () => {
         setPage(0);
     };
 
+    const CategorySelector = ({ rowKey, onLock }) => {
+        return (
+            <Stack direction="row" spacing={1} alignItems="center">
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <Select
+                        displayEmpty
+                        value={selectedCategories[rowKey] || ''}
+                        onChange={(e) =>
+                            setSelectedCategories(prev => ({ ...prev, [rowKey]: e.target.value }))
+                        }
+                    >
+                        <MenuItem value="">Select Category</MenuItem>
+                        {budgetCategories.map((cat) => (
+                            <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                        if (!selectedCategories[rowKey]) return;
+                        onLock(rowKey, selectedCategories[rowKey]);
+                        setSelectedCategories(prev => ({ ...prev, [rowKey]: '' }));
+                    }}
+                >
+                    Lock
+                </Button>
+            </Stack>
+        );
+    };
+
+
     return (
         <Box p={3}>
             <Typography variant="h5" gutterBottom fontWeight={600}>
-                Super User Budget Lock Manager ({glyear})
+                Super User ({glyear})
             </Typography>
 
             <FormControl sx={{ minWidth: 200, mb: 2 }} size="small">
-                <InputLabel>Status Filter</InputLabel>
-                <Select
-                    value={statusFilter}
-                    label="Status Filter"
-                    onChange={(e) => {
-                        setLoading(true);
-                        setStatusFilter(e.target.value);
-                    }}
-                >
-                    <MenuItem value="submitted">Submitted</MenuItem>
-                    <MenuItem value="not_submitted">Not Submitted</MenuItem>
-                    <MenuItem value="all">All</MenuItem>
-                </Select>
+                <Stack direction="row" spacing={2} sx={{ mb: 2 }} flexWrap="wrap">
+                    <MultiSelectDropdown
+                        label="Region"
+                        options={regionOptions}
+                        selected={selectedRegions}
+                        onChange={setSelectedRegions}
+                    />
+
+                    <MultiSelectDropdown
+                        label="Company"
+                        options={companyOptions}
+                        selected={selectedCompanyIds}
+                        onChange={setSelectedCompanyIds}
+                    />
+
+
+                    <MultiSelectDropdown
+                        label="Profit Center"
+                        options={profitCenterOptions}
+                        selected={selectedProfitCenters}
+                        onChange={setSelectedProfitCenters}
+                    />
+
+                    <MultiSelectDropdown
+                        label="Cost Center"
+                        options={costCenterOptions}
+                        selected={selectedCostCenters}
+                        onChange={setSelectedCostCenters}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <InputLabel>Status Filter</InputLabel>
+                        <Select
+                            value={statusFilter}
+                            label="Status Filter"
+                            onChange={(e) => {
+                                setLoading(true);
+                                setStatusFilter(e.target.value);
+                            }}
+                        >
+                            <MenuItem value="requested">Unlock Requested</MenuItem>
+                            <MenuItem value="submitted">Submitted</MenuItem>
+                            <MenuItem value="not_submitted">Not Submitted</MenuItem>
+                            <MenuItem value="all">All</MenuItem>
+                        </Select>
+                    </FormControl>
+                </Stack>
+                <Stack direction="row" spacing={2} mb={2} alignItems="center" flexWrap="wrap">
+                    <MultiSelectDropdown
+                        label="Categories to Lock"
+                        options={budgetCategories}
+                        selected={selectedLockCategories}
+                        onChange={setSelectedLockCategories}
+                    />
+
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        disabled={selectedLockCategories.length === 0 || actionLoading}
+                        onClick={async () => {
+                            const confirmed = window.confirm(
+                                `Lock selected categories for filtered cost centers?\n[${selectedLockCategories.join(', ')}]`
+                            );
+                            if (!confirmed) return;
+
+                            setActionLoading(true);
+                            setLoading(true)
+                            try {
+                                await axiosInstance.post('/budget-lock/bulk-lock-categories', {
+                                    glyear,
+                                    categories: selectedLockCategories,
+                                    filter: {
+                                        region: selectedRegions,
+                                        companyid: selectedCompanyIds,
+                                        profit_center: selectedProfitCenters,
+                                        cost_center: selectedCostCenters
+                                    },
+                                    status: statusFilter
+                                });
+                                showSnackbar('✅ Categories locked');
+                                fetchLocks();
+                            } catch (err) {
+                                console.error('Lock error:', err);
+                                showSnackbar('❌ Lock failed', 'error');
+                            } finally {
+                                setActionLoading(false);
+                                setLoading(false)
+                            }
+                        }}
+                    >
+                        🔒 Lock Selected Categories
+                    </Button>
+
+                    <Button
+                        variant="outlined"
+                        color="warning"
+                        disabled={actionLoading}
+                        onClick={async () => {
+                            const confirmed = window.confirm("Unlock all categories for filtered cost centers?");
+                            if (!confirmed) return;
+
+                            setActionLoading(true);
+                            setLoading(true)
+                            try {
+                                await axiosInstance.post('/budget-lock/bulk-unlock-categories', {
+                                    glyear,
+                                    filter: {
+                                        region: selectedRegions,
+                                        companyid: selectedCompanyIds,
+                                        profit_center: selectedProfitCenters,
+                                        cost_center: selectedCostCenters
+                                    },
+                                    status: statusFilter
+                                });
+                                showSnackbar('✅ All categories unlocked');
+                                fetchLocks();
+                            } catch (err) {
+                                console.error('Unlock error:', err);
+                                showSnackbar('❌ Unlock failed', 'error');
+                            } finally {
+                                setActionLoading(false);
+                                setLoading(false)
+                            }
+                        }}
+                    >
+                        🔓 Unlock All Categories
+                    </Button>
+
+                    <Button
+                        variant="contained"
+                        color="error"
+                        disabled={actionLoading}
+                        onClick={async () => {
+                            const confirmed = window.confirm("Reject all submitted budgets for filtered cost centers?\nThis will unlock them for editing.");
+                            if (!confirmed) return;
+
+                            setActionLoading(true);
+                            setLoading(true)
+                            try {
+                                await axiosInstance.post('/budget-lock/bulk-approve-unlock', {
+                                    glyear,
+                                    filter: {
+                                        region: selectedRegions,
+                                        companyid: selectedCompanyIds,
+                                        profit_center: selectedProfitCenters,
+                                        cost_center: selectedCostCenters
+                                    },
+                                    status: statusFilter
+                                });
+                                showSnackbar('✅ All filtered submitted budgets rejected');
+                                fetchLocks();
+                            } catch (err) {
+                                console.error('Reject error:', err);
+                                showSnackbar('❌ Rejection failed', 'error');
+                            } finally {
+                                setActionLoading(false);
+                                setLoading(false)
+                            }
+                        }}
+                    >
+                        🚫 Reject All Submitted
+                    </Button>
+
+
+                </Stack>
+
+
             </FormControl>
 
             {loading ? (
@@ -143,6 +426,7 @@ const SuperDashboardPage = () => {
                     </Box>
                 </Fade>
             ) : (
+
                 <Paper sx={{ backgroundColor: morandiColors.background }}>
                     <TableContainer>
                         <Table size="small">
@@ -201,16 +485,7 @@ const SuperDashboardPage = () => {
 
                                             <TableCell>
                                                 <Stack direction="row" spacing={1}>
-                                                    {(
-                                                        <Button
-                                                            variant="outlined"
-                                                            size="small"
-                                                            color="primary"
-                                                            onClick={() => handleLock(row.cost_center_name, 'Sales')}
-                                                        >
-                                                            Lock Sales
-                                                        </Button>
-                                                    )}
+                                                    <CategorySelector rowKey={row.cost_center_name} onLock={handleLock} />
                                                     {Object.keys(row.category_locks || {}).length > 0 && (
                                                         <IconButton onClick={() => handleUnlock(row.cost_center_name)} color="success">
                                                             <LockOpenIcon />
@@ -226,9 +501,9 @@ const SuperDashboardPage = () => {
                                                     >
                                                         <BlockIcon />
                                                     </IconButton>
-
                                                 </Stack>
                                             </TableCell>
+
                                         </TableRow>
                                     ))}
                             </TableBody>
@@ -245,8 +520,16 @@ const SuperDashboardPage = () => {
                     />
                 </Paper>
             )}
+            <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={() => setSnackbarOpen(false)}>
+                <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>
+                    {snackbarMessage}
+                </Alert>
+            </Snackbar>
+
         </Box>
+
     );
+
 };
 
 export default SuperDashboardPage;
